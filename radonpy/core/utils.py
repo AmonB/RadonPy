@@ -16,6 +16,7 @@ import pickle
 import json
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
 from . import const
 from ..ff import ff_class
 

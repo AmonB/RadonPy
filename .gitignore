@@ -1,0 +1,5 @@
+
+#python installation files
+build
+*__pycache__
+*.egg-info
