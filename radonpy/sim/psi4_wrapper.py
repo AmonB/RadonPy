@@ -261,7 +261,6 @@ class Psi4w():
             'STEP_TYPE': geom_algorithm,
             'OPTKING__ENSURE_BT_CONVERGENCE': True,
             'DYNAMIC_LEVEL': dynamic_level,
-            'PRINT_OPT_PARAMS': True,
         }
 
         # Frozen coordinates
@@ -362,7 +361,6 @@ class Psi4w():
             'STEP_TYPE': geom_algorithm,
             'OPTKING__ENSURE_BT_CONVERGENCE': True,
             'DYNAMIC_LEVEL': dynamic_level,
-            'PRINT_OPT_PARAMS': True,
         }
 
         if len(atoms) == 2:
