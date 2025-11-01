@@ -111,6 +111,21 @@ class LAMMPS():
         else:
             opt_flag = False
 
+        # Check if mpirun is available
+        if mpi != 0:
+            try:
+                mpi_exec = const.mpi_cmd.split()[0] if const.mpi_cmd else 'mpirun'
+                cp_check = subprocess.run([mpi_exec, '--version'], 
+                             stdout=subprocess.PIPE, 
+                             stderr=subprocess.PIPE, 
+                             timeout=5)
+                if cp_check.returncode != 0:
+                    mpi = 0
+                    utils.radon_print('mpirun is not available. Parallel number of MPI is changed to zero.', level=2)
+            except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+                mpi = 0
+                utils.radon_print('mpirun is not available. Parallel number of MPI is changed to zero.', level=2)
+
         if mpi > 0:
             mpi_cmd = const.mpi_cmd % (mpi)
         elif mpi == 0:
