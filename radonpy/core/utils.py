@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -16,11 +16,10 @@ import pickle
 import json
 from rdkit import Chem
 from rdkit.Chem import AllChem
-
 from . import const
 from ..ff import ff_class
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 
 class Angle():
@@ -82,6 +81,29 @@ class Improper():
             'b': int(self.b),
             'c': int(self.c),
             'd': int(self.d),
+            'ff': self.ff.to_dict()
+        }
+        return dic
+
+class CMAP():
+    """
+        utils.CMAP() object
+    """
+    def __init__(self, a, b, c, d, e, ff):
+        self.a = a
+        self.b = b
+        self.c = c
+        self.d = d
+        self.e = e
+        self.ff = ff
+
+    def to_dict(self):
+        dic = {
+            'a': int(self.a),
+            'b': int(self.b),
+            'c': int(self.c),
+            'd': int(self.d),
+            'e': int(self.e),
             'ff': self.ff.to_dict()
         }
         return dic
@@ -759,6 +781,12 @@ def MolToJSON_dict(mol, useRDKitExtensions=False):
             atom_data['vy'] = a.GetDoubleProp('vy')
             atom_data['vz'] = a.GetDoubleProp('vz')
 
+        # crosslinking
+        if a.HasProp('CL_remove'):
+            atom_data['CL_remove'] = a.GetBoolProp('CL_remove')
+        if a.HasProp('CL_react'):
+            atom_data['CL_react'] = a.GetBoolProp('CL_react')
+
         # others
         atom_data['isotope'] = a.GetIsotope()
         if a.HasProp('mol_id'):
@@ -785,95 +813,106 @@ def MolToJSON_dict(mol, useRDKitExtensions=False):
         if b.HasProp('ff_r0'):
             bond_data['ff_r0'] = b.GetDoubleProp('ff_r0')
 
+        # crosslinking
+        if b.HasProp('CL_new_bond'):
+            bond_data['CL_new_bond'] = b.GetBoolProp('CL_new_bond')
+
+        # others
+        if b.HasProp('new_bond'):
+            bond_data['new_bond'] = b.GetBoolProp('new_bond')
+
         bond_prop.append(bond_data)
     radonpy_ext['bonds'] = bond_prop
 
  
     # angle
     if hasattr(mol, 'angles'):
-        # if len(mol.angles) > 0 and hasattr(mol.angles[list(mol.angles.keys())[0]], 'to_dict'):
+        if len(mol.angles) > 0 and hasattr(mol.angles[list(mol.angles.keys())[0]], 'to_dict'):
             angle_prop = [ang.to_dict() for key, ang in mol.angles.items()]
             radonpy_ext['angles'] = angle_prop
-        # else:
-        #     angle_prop = []
-        #     for key, ang in mol.angles.items():
-        #         dic = {
-        #             'a': ang.a,
-        #             'b': ang.b,
-        #             'c': ang.c,
-        #             'ff': {
-        #                 'ff_type': ang.ff.type,
-        #                 'k': ang.ff.k,
-        #                 'theta0': ang.ff.theta0,
-        #             }
-        #         }
-        #         angle_prop.append(dic)
+        else:
+            angle_prop = []
+            for key, ang in mol.angles.items():
+                dic = {
+                    'a': int(ang.a),
+                    'b': int(ang.b),
+                    'c': int(ang.c),
+                    'ff': {
+                        'ff_type': str(ang.ff.type),
+                        'k': float(ang.ff.k),
+                        'theta0': float(ang.ff.theta0),
+                    }
+                }
+                angle_prop.append(dic)
+            radonpy_ext['angles'] = angle_prop
     else:
         angle_prop = []
     
     # dihedral
     if hasattr(mol, 'dihedrals'):
-        # if len(mol.dihedrals) > 0 and hasattr(mol.dihedrals[list(mol.dihedrals.keys())[0]], 'to_dict'):
+        if len(mol.dihedrals) > 0 and hasattr(mol.dihedrals[list(mol.dihedrals.keys())[0]], 'to_dict'):
             dihedral_prop = [dih.to_dict() for key, dih in mol.dihedrals.items()]
             radonpy_ext['dihedrals'] = dihedral_prop
-        # else:
-        #     dihedral_prop = []
-        #     for key, dih in mol.dihedrals.items():
-        #         dic = {
-        #             'a': dih.a,
-        #             'b': dih.b,
-        #             'c': dih.c,
-        #             'd': dih.d,
-        #             'ff': {
-        #                 'ff_type': dih.ff.type,
-        #                 'k': dih.ff.k,
-        #                 'd0': dih.ff.d0,
-        #                 'm': dih.ff.m,
-        #                 'n': dih.ff.n,
-        #             }
-        #         }
-        #         dihedral_prop.append(dic)
+        else:
+            dihedral_prop = []
+            for key, dih in mol.dihedrals.items():
+                dic = {
+                    'a': int(dih.a),
+                    'b': int(dih.b),
+                    'c': int(dih.c),
+                    'd': int(dih.d),
+                    'ff': {
+                        'ff_type': str(dih.ff.type),
+                        'k': list([float(x) for x in dih.ff.k]),
+                        'd0': list([float(x) for x in dih.ff.d0]),
+                        'm': int(dih.ff.m),
+                        'n': list([int(x) for x in dih.ff.n]),
+                    }
+                }
+                dihedral_prop.append(dic)
+            radonpy_ext['dihedrals'] = dihedral_prop
     else:
         dihedral_prop = []
 
     # improper
     if hasattr(mol, 'impropers'):
-        # if len(mol.impropers) > 0 and hasattr(mol.impropers[list(mol.impropers.keys())[0]], 'to_dict'):
+        if len(mol.impropers) > 0 and hasattr(mol.impropers[list(mol.impropers.keys())[0]], 'to_dict'):
             improper_prop = [imp.to_dict() for key, imp in mol.impropers.items()]
             radonpy_ext['impropers'] = improper_prop
-        # else:
-        #     improper_prop = []
-        #     for key, imp in mol.impropers.items():
-        #         dic = {
-        #             'a': imp.a,
-        #             'b': imp.b,
-        #             'c': imp.c,
-        #             'd': imp.d,
-        #             'ff': {
-        #                 'ff_type': imp.ff.type,
-        #                 'k': imp.ff.k,
-        #                 'd0': imp.ff.d0,
-        #                 'n': imp.ff.n,
-        #             }
-        #         }
-        #         improper_prop.append(dic)
+        else:
+            improper_prop = []
+            for key, imp in mol.impropers.items():
+                dic = {
+                    'a': int(imp.a),
+                    'b': int(imp.b),
+                    'c': int(imp.c),
+                    'd': int(imp.d),
+                    'ff': {
+                        'ff_type': str(imp.ff.type),
+                        'k': float(imp.ff.k),
+                        'd0': int(imp.ff.d0),
+                        'n': int(imp.ff.n),
+                    }
+                }
+                improper_prop.append(dic)
+            radonpy_ext['impropers'] = improper_prop
     else:
         improper_prop = []
 
     # cell
     if hasattr(mol, 'cell'):
-        # if hasattr(mol.cell, 'to_dict'):
+        if hasattr(mol.cell, 'to_dict'):
             cell_prop = mol.cell.to_dict()
             radonpy_ext['cell'] = cell_prop
-        # else:
-        #     cell_prop = {
-        #         'xhi': mol.cell.xhi,
-        #         'xlo': mol.cell.xlo,
-        #         'yhi': mol.cell.yhi,
-        #         'ylo': mol.cell.ylo,
-        #         'zhi': mol.cell.zhi,
-        #         'zlo': mol.cell.zlo,
-        #     }
+        else:
+            cell_prop = {
+                'xhi': float(mol.cell.xhi),
+                'xlo': float(mol.cell.xlo),
+                'yhi': float(mol.cell.yhi),
+                'ylo': float(mol.cell.ylo),
+                'zhi': float(mol.cell.zhi),
+                'zlo': float(mol.cell.zlo),
+            }
 
     json_dict['molecules'][0]['extensions'].append(radonpy_ext)
 
@@ -883,7 +922,17 @@ def MolToJSON_dict(mol, useRDKitExtensions=False):
 def JSONToMol(file):
     with open(file, mode='r') as f:
         json_dict = json.load(f)
+    mol = JSONToMol_dict(json_dict)
+    return mol
 
+
+def JSONToMol_str(json_str):
+    json_dict = json.loads(json_str)
+    mol = JSONToMol_dict(json_dict)
+    return mol
+
+
+def JSONToMol_dict(json_dict):
     radonpy_ext = None
     for ext in json_dict['molecules'][0]['extensions']:
         if 'name' in ext and ext['name'] == 'radonpy_extention':
@@ -891,9 +940,17 @@ def JSONToMol(file):
     if radonpy_ext is None:
         radon_print('RadonPy extention data was not found in JSON file.', level=3)
 
+    # Avoiding bug in RDKit
+    for b in json_dict['molecules'][0]['bonds']:
+        if 'stereo' in b and 'stereoAtoms' not in b:
+            b['stereo'] = 'either'
+
     mol = Chem.rdMolInterchange.JSONToMols(json.dumps(json_dict))[0]
     Chem.SanitizeMol(mol)
 
+    if not mol.HasProp('pair_style'):
+        radon_print('pair_style is missing. Assuming lj for pair_style.', level=2)
+        mol.SetProp('pair_style', 'lj')
     for i, a in enumerate(mol.GetAtoms()):
         atom_data = radonpy_ext['atoms'][i]
 
@@ -925,6 +982,12 @@ def JSONToMol(file):
             a.SetDoubleProp('vy', float(atom_data['vy']))
             a.SetDoubleProp('vz', float(atom_data['vz']))
 
+        # crosslinking
+        if 'CL_remove' in atom_data:
+            a.SetBoolProp('CL_remove', bool(atom_data['CL_remove']))
+        if 'CL_react' in atom_data:
+            a.SetBoolProp('CL_react', bool(atom_data['CL_react']))
+
         # others
         a.SetIsotope(int(atom_data['isotope']))
         if 'mol_id' in atom_data:
@@ -943,6 +1006,9 @@ def JSONToMol(file):
             )
 
 
+    if not mol.HasProp('bond_style'):
+        radon_print('bond_style is missing. Assuming harmonic for bond_style.', level=2)
+        mol.SetProp('bond_style', 'harmonic')
     for i, b in enumerate(mol.GetBonds()):
         bond_data = radonpy_ext['bonds'][i]
 
@@ -954,12 +1020,22 @@ def JSONToMol(file):
         if 'ff_r0' in bond_data:
             b.SetDoubleProp('ff_r0', float(bond_data['ff_r0']))
 
+        # crosslinking
+        if 'CL_new_bond' in bond_data:
+            b.SetBoolProp('CL_new_bond', bool(bond_data['CL_new_bond']))
 
+        # others
+        if 'new_bond' in bond_data:
+            b.SetBoolProp('new_bond', bool(bond_data['new_bond']))
+
+    if not mol.HasProp('angle_style'):
+        radon_print('angle_style is missing. Assuming harmonic for angle_style.', level=2)
+        mol.SetProp('angle_style', 'harmonic')
     if 'angles' in radonpy_ext:
-        if hasattr(mol, 'angle_style') and mol.angle_style == 'harmonic':
-            angle_class = ff_class.GAFF_Angle
+        if mol.GetProp('angle_style') == 'harmonic':
+            angle_class = ff_class.Angle_harmonic
         else:
-            angle_class = ff_class.GAFF_Angle
+            radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
 
         angle_prop = {}
         for ang in radonpy_ext['angles']:
@@ -973,11 +1049,16 @@ def JSONToMol(file):
         setattr(mol, 'angles', angle_prop)
 
 
+    if not mol.HasProp('dihedral_style'):
+        radon_print('dihedral_style is missing. Assuming fourier for dihedral_style.', level=2)
+        mol.SetProp('dihedral_style', 'fourier')
     if 'dihedrals' in radonpy_ext:
-        if hasattr(mol, 'dihedral_style') and mol.dihedral_style == 'fourier':
-            dihedral_class = ff_class.GAFF_Dihedral
+        if mol.GetProp('dihedral_style') == 'fourier':
+            dihedral_class = ff_class.Dihedral_fourier
+        elif mol.GetProp('dihedral_style') == 'harmonic':
+            dihedral_class = ff_class.Dihedral_harmonic
         else:
-            dihedral_class = ff_class.GAFF_Dihedral
+            radon_print('dihedral_style %s is not available.' % mol.GetProp('dihedral_style'), level=3)
 
         dihedral_prop = {}
         for dih in radonpy_ext['dihedrals']:
@@ -992,11 +1073,16 @@ def JSONToMol(file):
         setattr(mol, 'dihedrals', dihedral_prop)
 
 
+    if not mol.HasProp('improper_style'):
+        radon_print('improper_style is missing. Assuming cvff for improper_style.', level=2)
+        mol.SetProp('improper_style', 'cvff')
     if 'impropers' in radonpy_ext:
-        if hasattr(mol, 'improper_style') and mol.improper_style == 'cvff':
-            improper_class = ff_class.GAFF_Improper
+        if mol.GetProp('improper_style') == 'cvff':
+            improper_class = ff_class.Improper_cvff
+        elif mol.GetProp('improper_style') == 'umbrella':
+            improper_class = ff_class.Improper_umbrella
         else:
-            improper_class = ff_class.GAFF_Improper
+            radon_print('improper_style %s is not available.' % mol.GetProp('improper_style'), level=3)
 
         improper_prop = {}
         for imp in radonpy_ext['impropers']:
@@ -1040,11 +1126,11 @@ def pickle_load(path):
     try:
         with open(path, mode='rb') as f:
             mol = pickle.load(f)
-    except BaseException as e:
-        radon_print('%s' % e, level=2)
+    except Exception as e:
+        radon_print('Cannot load pickle file %s. %s' % (path, e), level=2)
         return None
 
-    # Backward campatibility from version 0.2 to 0.3
+    # Backward campatibility from version 0.2 to 1.0
     if hasattr(mol, 'angles'):
         if type(mol.angles) == list:
             mol.angles = {'%i,%i,%i' % (ang.a, ang.b, ang.c): ang for ang in mol.angles}
@@ -1082,12 +1168,29 @@ def tqdm_stub(it, **kwargs):
     return it
 
 
-def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereochemistry_control=True):
+def star2h(smiles):
+    smiles = smiles.replace('[*]', '[3H]')
+    smiles = re.sub('\[([0-9]+)\*\]', lambda m: '[%iH]' % int(int(m.groups()[0])+2), smiles)
+    smiles = smiles.replace('*', '[3H]')
+    smiles = smiles.replace('[X]', '[65535H]')
+    smiles = smiles.replace('[LP-]', '[65534H-]')
+    return smiles
 
-    smi = smiles.replace('[*]', '[3H]')
-    smi = re.sub('\[([0-9]+)\*\]', lambda m: '[%iH]' % int(int(m.groups()[0])+2), smi)
-    smi = smi.replace('*', '[3H]')
 
+def h2star(smiles):
+    smiles = smiles.replace('[65534H-]', '[LP-]')
+    smiles = smiles.replace('[65535H]', '[X]')
+    smiles = smiles.replace('[3H]', '*')
+    smiles = re.sub(
+        '\[([0-9]+)H\]',
+        lambda m: '[%i*]' % int(int(m.groups()[0])-2) if int(int(m.groups()[0])) >= 3 else '[%iH]' % int(int(m.groups()[0])),
+        smiles)
+    return smiles
+
+
+def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereochemistry_control=True, sanitize=True):
+
+    smi = star2h(smiles)
     l = re.findall(r'\[([0-9]+)H\]', smi)
     labels = [int(x) for x in l if int(x) >= 3]
     if len(labels) > 0:
@@ -1103,10 +1206,19 @@ def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereoche
         etkdg = AllChem.ETKDG()
     etkdg.enforceChirality=True
     etkdg.useRandomCoords = False
+    if hasattr(etkdg, 'maxIterations'):
+        etkdg.maxIterations = 100
+    elif hasattr(etkdg, 'maxAttempts'):
+        etkdg.maxAttempts = 100
+    else:
+        radon_print('The installed RDKit version is not supported.', level=3)
 
     try:
-        mol = Chem.MolFromSmiles(smi)
-        mol = Chem.AddHs(mol)
+        if sanitize:
+            mol = Chem.MolFromSmiles(smi)
+            mol = Chem.AddHs(mol)
+        else:
+            mol = Chem.MolFromSmiles(smi, sanitize=False)
     except Exception as e:
         radon_print('Cannot transform to RDKit Mol object from %s' % smiles, level=3)
         return None
@@ -1227,6 +1339,46 @@ def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereoche
 
     return mol
 
+def mol_from_pdb(pdb_file, charge=False):
+
+    mol = Chem.MolFromPDBFile(pdb_file, removeHs=False)
+
+    # read charges
+    if charge:
+        charges = []
+        lines = []
+        try:
+            f = open(pdb_file, 'r')
+            lines = f.readlines()
+            f.close()
+        except:
+            f.close()
+            print("ERROR: Failed to read " + pdb_file)
+            sys.exit()
+
+        try:
+            for i, line in enumerate(lines):
+                if line[:4] == 'ATOM':
+                    q = float(line[80:].strip())
+                    charges.append(q)
+                    continue
+        except:
+            print("ERROR: Failed to read charges from " + pdb_file)
+            sys.exit()
+
+        natom = mol.GetNumAtoms()
+        if natom != len(charges):
+            print("ERROR: Failed to read charges from " + pdb_file)
+
+        for i, atom in enumerate(mol.GetAtoms()):
+            atom.SetDoubleProp('AtomicCharge', charges[i])
+
+    natom = mol.GetNumAtoms()
+    for i, atom in enumerate(mol.GetAtoms()):
+        atom.SetProp('ff_type', atom.GetPDBResidueInfo().GetName())
+        atom.SetBoolProp('terminal', i == 0 or i == natom - 1)
+        
+    return mol
 
 def is_in_ring(ab, max_size=10):
 

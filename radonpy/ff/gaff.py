@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -11,10 +11,10 @@ import os
 import json
 from itertools import permutations
 from rdkit import Chem
-from ..core import utils
-from ..core import calc
+from ..core import calc, utils
+from . import ff_class
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 
 class GAFF():
@@ -90,6 +90,8 @@ class GAFF():
             Chem.rdmolops.Kekulize(mol, clearAromaticFlags=True)
             Chem.rdmolops.SetAromaticity(mol, model=Chem.rdmolops.AromaticityModel.AROMATICITY_MDL)
 
+        mol.SetProp('ff_name', str(self.name))
+        mol.SetProp('ff_class', str(self.ff_class))
         result = self.assign_ptypes(mol)
         if result: result = self.assign_btypes(mol)
         if result: result = self.assign_atypes(mol)
@@ -886,7 +888,7 @@ class GAFF():
     
         angle = utils.Angle(
             a=a, b=b, c=c,
-            ff=self.Angle_ff(
+            ff=ff_class.Angle_harmonic(
                 ff_type=self.param.at[at].tag,
                 k=self.param.at[at].k,
                 theta0=self.param.at[at].theta0
@@ -1018,7 +1020,7 @@ class GAFF():
 
         dihedral = utils.Dihedral(
             a=a, b=b, c=c, d=d,
-            ff=self.Dihedral_ff(
+            ff=ff_class.Dihedral_fourier(
                 ff_type=self.param.dt[dt].tag,
                 k=self.param.dt[dt].k,
                 d0=self.param.dt[dt].d,
@@ -1139,7 +1141,7 @@ class GAFF():
             
         improper = utils.Improper(
             a=a, b=b, c=c, d=d,
-            ff=self.Improper_ff(
+            ff=ff_class.Improper_cvff(
                 ff_type=self.param.it[it].tag,
                 k=self.param.it[it].k,
                 d0=self.param.it[it].d,

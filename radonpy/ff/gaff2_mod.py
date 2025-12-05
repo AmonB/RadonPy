@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -10,7 +10,7 @@ import os
 from ..core import utils
 from .gaff2 import GAFF2
 
-__version__ = '0.3.0b1'
+__version__ = '1.0b1'
 
 
 class GAFF2_mod(GAFF2):

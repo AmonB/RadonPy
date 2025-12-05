@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -9,6 +9,7 @@
 import numpy as np
 import pandas as pd
 import re
+import os
 from copy import copy
 import itertools
 import datetime
@@ -21,7 +22,7 @@ from rdkit import RDLogger
 from . import calc, const, utils
 from ..ff.gaff2_mod import GAFF2_mod
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 MD_avail = True
 try:
@@ -148,6 +149,8 @@ def connect_mols(mol1, mol2, bond_length=1.5, dihedral=np.pi, random_rot=False, 
     if del_idx1 < tail_ne_idx: tail_ne_idx -= 1
     if del_idx2 < head_ne_idx: head_ne_idx -= 1
     mol = utils.add_bond(mol, tail_ne_idx, head_ne_idx, order=Chem.rdchem.BondType.SINGLE)
+    new_bond = mol.GetBondBetweenAtoms(tail_ne_idx, head_ne_idx)
+    new_bond.SetBoolProp('new_bond', True)
     #if bd1type == 2.0 or bd2type == 2.0:
     #    mol = utils.add_bond(mol, tail_ne_idx, head_ne_idx, order=Chem.rdchem.BondType.DOUBLE)
     #elif bd1type == 3.0 or bd2type == 3.0:
@@ -187,7 +190,7 @@ def combine_mols(mol1, mol2, res_name_1='RU0', res_name_2='RU0'):
     """
     poly.combine_mols
 
-    Combining mol1 and mol2 taking over the angles, dihedrals, impropers, and cell data
+    Combining mol1 and mol2 taking over the angles, dihedrals, impropers, cmaps and cell data
 
     Args:
         mol1, mol2: RDkit Mol object
@@ -206,6 +209,7 @@ def combine_mols(mol1, mol2, res_name_1='RU0', res_name_2='RU0'):
     angles = {}
     dihedrals = {}
     impropers = {}
+    cmaps = {}
     cell = None
 
     if hasattr(mol1, 'angles'):
@@ -246,6 +250,20 @@ def combine_mols(mol1, mol2, res_name_1='RU0', res_name_2='RU0'):
                                     ff=improper.ff
                                 )
     
+    if hasattr(mol1, 'cmaps'):
+        cmaps = mol1.cmaps.copy()
+    if hasattr(mol2, 'cmaps'):
+        for cmap in mol2.cmaps.values():
+            key = '%i,%i,%i,%i,%i' % (cmap.a+mol1_n, cmap.b+mol1_n, cmap.c+mol1_n, cmap.d+mol1_n, cmap.e+mol1_n)
+            cmaps[key] = utils.CMAP(
+                               a=cmap.a+mol1_n,
+                               b=cmap.b+mol1_n,
+                               c=cmap.c+mol1_n,
+                               d=cmap.d+mol1_n,
+                               e=cmap.e+mol1_n,
+                               ff=cmap.ff
+                           )
+
     if hasattr(mol1, 'cell'):
         cell = copy(mol1.cell)
     elif hasattr(mol2, 'cell'):
@@ -300,7 +318,38 @@ def combine_mols(mol1, mol2, res_name_1='RU0', res_name_2='RU0'):
     setattr(mol, 'angles', angles)
     setattr(mol, 'dihedrals', dihedrals)
     setattr(mol, 'impropers', impropers)
-    if cell is not None: setattr(mol, 'cell', cell)
+    if len(cmaps) > 0:
+        setattr(mol, 'cmaps', cmaps)
+    if mol1.HasProp('pair_style'):
+        mol.SetProp('pair_style', mol1.GetProp('pair_style'))
+    elif mol2.HasProp('pair_style'):
+        mol.SetProp('pair_style', mol2.GetProp('pair_style'))
+    if mol1.HasProp('bond_style'):
+        mol.SetProp('bond_style', mol1.GetProp('bond_style'))
+    elif mol2.HasProp('bond_style'):
+        mol.SetProp('bond_style', mol2.GetProp('bond_style'))
+    if mol1.HasProp('angle_style'):
+        mol.SetProp('angle_style', mol1.GetProp('angle_style'))
+    elif mol2.HasProp('angle_style'):
+        mol.SetProp('angle_style', mol2.GetProp('angle_style'))
+    if mol1.HasProp('dihedral_style'):
+        mol.SetProp('dihedral_style', mol1.GetProp('dihedral_style'))
+    elif mol2.HasProp('dihedral_style'):
+        mol.SetProp('dihedral_style', mol2.GetProp('dihedral_style'))
+    if mol1.HasProp('improper_style'):
+        mol.SetProp('improper_style', mol1.GetProp('improper_style'))
+    elif mol2.HasProp('improper_style'):
+        mol.SetProp('improper_style', mol2.GetProp('improper_style'))
+    if mol1.HasProp('ff_name'):
+        mol.SetProp('ff_name', mol1.GetProp('ff_name'))
+    elif mol2.HasProp('ff_name'):
+        mol.SetProp('ff_name', mol2.GetProp('ff_name'))
+    if mol1.HasProp('ff_class'):
+        mol.SetProp('ff_class', mol1.GetProp('ff_class'))
+    elif mol2.HasProp('ff_class'):
+        mol.SetProp('ff_class', mol2.GetProp('ff_class'))
+    if cell is not None:
+        setattr(mol, 'cell', cell)
 
     return mol
 
@@ -2883,106 +2932,106 @@ def check_3d_structure_cell(cell, mol_coord, dist_min=2.0):
 ##########################################################
 # Utility functions for calculate polymerization degree 
 ##########################################################
-def calc_n_from_num_atoms(mols, natom, ratio=[1.0], label=1, terminal1=None, terminal2=None):
-    """
-    poly.calc_n_from_num_atoms
+# def calc_n_from_num_atoms(mols, natom, ratio=[1.0], label=1, terminal1=None, terminal2=None):
+#     """
+#     poly.calc_n_from_num_atoms
 
-    Calculate polymerization degree from target number of atoms
+#     Calculate polymerization degree from target number of atoms
 
-    Args:
-        mols: List of RDkit Mol object
-        natom: Target of number of atoms
+#     Args:
+#         mols: List of RDkit Mol object
+#         natom: Target of number of atoms
 
-    Optional args:
-        terminal1, terminal2: Terminal substruct of RDkit Mol object
-        ratio: List of monomer ratio
+#     Optional args:
+#         terminal1, terminal2: Terminal substruct of RDkit Mol object
+#         ratio: List of monomer ratio
 
-    Returns:
-        int
-    """
+#     Returns:
+#         int
+#     """
 
-    if type(mols) is Chem.Mol:
-        mols = [mols]
-    elif type(mols) is not list:
-        utils.radon_print('Input should be an RDKit Mol object or its List', level=3)
-        return None
+#     if type(mols) is Chem.Mol:
+#         mols = [mols]
+#     elif type(mols) is not list:
+#         utils.radon_print('Input should be an RDKit Mol object or its List', level=3)
+#         return None
 
-    if len(mols) != len(ratio):
-        utils.radon_print('Inconsistency length of mols and ratio', level=3)
-        return None
+#     if len(mols) != len(ratio):
+#         utils.radon_print('Inconsistency length of mols and ratio', level=3)
+#         return None
 
-    ratio = np.array(ratio) / np.sum(ratio)
+#     ratio = np.array(ratio) / np.sum(ratio)
 
-    mol_n = 0.0
-    for i, mol in enumerate(mols):
-        new_mol = remove_linker_atoms(mol, label=label)
-        mol_n += new_mol.GetNumAtoms() * ratio[i]
+#     mol_n = 0.0
+#     for i, mol in enumerate(mols):
+#         new_mol = remove_linker_atoms(mol, label=label)
+#         mol_n += new_mol.GetNumAtoms() * ratio[i]
     
-    if terminal1 is not None:
-        new_ter1 = remove_linker_atoms(terminal1)
-        ter1_n = new_ter1.GetNumAtoms()
-    else:
-        ter1_n = 0
+#     if terminal1 is not None:
+#         new_ter1 = remove_linker_atoms(terminal1)
+#         ter1_n = new_ter1.GetNumAtoms()
+#     else:
+#         ter1_n = 0
 
-    if terminal2 is not None:
-        new_ter2 = remove_linker_atoms(terminal2)
-        ter2_n = new_ter2.GetNumAtoms()
-    elif terminal1 is not None:
-        ter2_n = ter1_n
-    else:
-        ter2_n = 0
+#     if terminal2 is not None:
+#         new_ter2 = remove_linker_atoms(terminal2)
+#         ter2_n = new_ter2.GetNumAtoms()
+#     elif terminal1 is not None:
+#         ter2_n = ter1_n
+#     else:
+#         ter2_n = 0
 
-    n = int((natom - ter1_n - ter2_n) / mol_n + 0.5)
+#     n = int((natom - ter1_n - ter2_n) / mol_n + 0.5)
     
-    return n
+#     return n
 
 
-def calc_n_from_mol_weight(mols, mw, ratio=[1.0], terminal1=None, terminal2=None):
-    """
-    poly.calc_n_from_mol_weight
+# def calc_n_from_mol_weight(mols, mw, ratio=[1.0], terminal1=None, terminal2=None):
+#     """
+#     poly.calc_n_from_mol_weight
 
-    Calculate polymerization degree from target molecular weight
+#     Calculate polymerization degree from target molecular weight
 
-    Args:
-        mols: List of RDkit Mol object
-        mw: Target of molecular weight
+#     Args:
+#         mols: List of RDkit Mol object
+#         mw: Target of molecular weight
 
-    Optional args:
-        terminal1, terminal2: Terminal substruct of RDkit Mol object
-        ratio: List of monomer ratio
+#     Optional args:
+#         terminal1, terminal2: Terminal substruct of RDkit Mol object
+#         ratio: List of monomer ratio
 
-    Returns:
-        int
-    """
-    if type(mols) is Chem.Mol:
-        mols = [mols]
-    elif type(mols) is not list:
-        utils.radon_print('Input should be an RDKit Mol object or its list', level=3)
-        return None
+#     Returns:
+#         int
+#     """
+#     if type(mols) is Chem.Mol:
+#         mols = [mols]
+#     elif type(mols) is not list:
+#         utils.radon_print('Input should be an RDKit Mol object or its list', level=3)
+#         return None
 
-    if len(mols) != len(ratio):
-        utils.radon_print('Inconsistency length of mols and ratio', level=3)
-        return None
+#     if len(mols) != len(ratio):
+#         utils.radon_print('Inconsistency length of mols and ratio', level=3)
+#         return None
 
-    ratio = np.array(ratio) / np.sum(ratio)
+#     ratio = np.array(ratio) / np.sum(ratio)
 
-    mol_mw = 0.0
-    for i, mol in enumerate(mols):
-        mol_mw += calc.molecular_weight(mol) * ratio[i]
+#     mol_mw = 0.0
+#     for i, mol in enumerate(mols):
+#         mol_mw += calc.molecular_weight(mol) * ratio[i]
     
-    ter1_mw = 0.0
-    if terminal1 is not None:
-        ter1_mw = calc.molecular_weight(terminal1)
+#     ter1_mw = 0.0
+#     if terminal1 is not None:
+#         ter1_mw = calc.molecular_weight(terminal1)
 
-    ter2_mw = 0.0
-    if terminal2 is not None:
-        ter2_mw = calc.molecular_weight(terminal2)
-    elif terminal1 is not None:
-        ter2_mw = ter1_mw
+#     ter2_mw = 0.0
+#     if terminal2 is not None:
+#         ter2_mw = calc.molecular_weight(terminal2)
+#     elif terminal1 is not None:
+#         ter2_mw = ter1_mw
 
-    n = int((mw - ter1_mw - ter2_mw) / mol_mw + 0.5)
+#     n = int((mw - ter1_mw - ter2_mw) / mol_mw + 0.5)
 
-    return n
+#     return n
 
 
 ##########################################################
@@ -3012,7 +3061,9 @@ def set_linker_flag(mol, reverse=False, label=1):
         atom.SetBoolProp('tail', False)
         atom.SetBoolProp('head_neighbor', False)
         atom.SetBoolProp('tail_neighbor', False)
-        if (atom.GetSymbol() == "H" and atom.GetIsotope() == label+2) or atom.GetSymbol() == "*":
+        if (atom.GetSymbol() == "H" and atom.GetIsotope() == label+2) or \
+           (atom.GetSymbol() == "*" and atom.GetProp('ff_type') != "MTIP") or \
+           (atom.HasProp('terminal') and atom.GetBoolProp('terminal')):
             atom.SetBoolProp('linker', True)
             if not flag:
                 mol_head_idx = atom.GetIdx()
@@ -3310,7 +3361,7 @@ def polymer_stats(mol, df=False, join=False):
 ##########################################################
 # Utility function for SMILES of polymers
 ##########################################################
-def polymerize_MolFromSmiles(smiles, n=2, terminal='C'):
+def polymerize_MolFromSmiles(smiles, n=2, terminal='C', label=1):
     """
     poly.polymerize_MolFromSmiles
 
@@ -3325,7 +3376,7 @@ def polymerize_MolFromSmiles(smiles, n=2, terminal='C'):
         RDkit Mol object
     """
 
-    poly_smiles = make_linearpolymer(smiles, n=n, terminal=terminal)
+    poly_smiles = make_linearpolymer(smiles, n=n, terminal=terminal, label=label)
 
     try:
         mol = Chem.MolFromSmiles(poly_smiles)
@@ -3336,7 +3387,7 @@ def polymerize_MolFromSmiles(smiles, n=2, terminal='C'):
     return mol
 
 
-def make_linearpolymer(smiles, n=2, terminal='C'):
+def make_linearpolymer(smiles, n=2, terminal='C', label=1):
     """
     poly.make_linearpolymer
 
@@ -3356,8 +3407,8 @@ def make_linearpolymer(smiles, n=2, terminal='C'):
     dummy_tail = '[Og]'
 
     smiles_in = smiles
-    smiles = smiles.replace('[*]', '*')
-    smiles = smiles.replace('[3H]', '*')
+    smiles = utils.star2h(smiles)
+    smiles = smiles.replace('[%iH]' % int(label+2), '*')
 
     if smiles.count('*') != 2:
         utils.radon_print('Illegal number of connecting points in SMILES. %s' % smiles_in, level=2)
@@ -3400,6 +3451,7 @@ def make_linearpolymer(smiles, n=2, terminal='C'):
 
         poly_smiles = Chem.MolToSmiles(mol)
         poly_smiles = poly_smiles.replace(dummy_head, terminal)
+        poly_smiles = utils.h2star(poly_smiles)
 
     except Exception as e:
         utils.radon_print('Cannot transform to polymer from monomer SMILES. %s' % smiles_in, level=2)
@@ -3408,7 +3460,7 @@ def make_linearpolymer(smiles, n=2, terminal='C'):
     return poly_smiles
 
 
-def make_cyclicpolymer(smiles, n=2, return_mol=False, removeHs=False):
+def make_cyclicpolymer(smiles, n=2, return_mol=False, removeHs=False, label=1):
     """
     poly.make_cyclicpolymer
 
@@ -3423,7 +3475,7 @@ def make_cyclicpolymer(smiles, n=2, return_mol=False, removeHs=False):
         SMILES or RDKit Mol object
     """
 
-    mol = polymerize_MolFromSmiles(smiles, n=n, terminal='*')
+    mol = polymerize_MolFromSmiles(smiles, n=n, terminal='*', label=label)
     # mol = utils.mol_from_smiles(smiles, stereochemistry_control=False)
     # mol = polymerize_mols(mol, n)
     if mol is None:
@@ -3739,14 +3791,13 @@ def _ff_test_mp_worker(args):
     return result
 
 
-def monomerization_smiles(smiles, min_length=1):
+def monomerization_smiles(smiles, min_length=1, label=1):
+
+    smi = utils.star2h(smiles)
     
-    if smiles.count('*') != 2:
+    if smi.count('[%iH]' % int(label+2)) != 2:
         utils.radon_print('Illegal number of connecting points in SMILES. %s' % smiles, level=2)
         return smiles
-
-    smi = smiles.replace('[*]', '[3H]')
-    smi = smi.replace('*', '[3H]')
 
     try:
         mol = Chem.MolFromSmiles(smi)
@@ -3767,7 +3818,7 @@ def monomerization_smiles(smiles, min_length=1):
             fmol = Chem.FragmentOnBonds(mol, bidx, addDummies=True)
             try:
                 RDLogger.DisableLog('rdApp.*')
-                fsmi = [Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]', '[*]', x).replace('[3H]', '[*]'))) for x in Chem.MolToSmiles(fmol).split('.')]
+                fsmi = [Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]', '[*]', x).replace('[%iH]' % int(label+2), '[*]'))) for x in Chem.MolToSmiles(fmol).split('.')]
             except:
                 RDLogger.EnableLog('rdApp.*')
                 continue
@@ -3785,34 +3836,34 @@ def monomerization_smiles(smiles, min_length=1):
     return smiles
 
 
-def extract_mainchain(smiles):
+def extract_mainchain(smiles, label=1):
 
     main_smi = None
 
-    fsmi = fragmentation_main_side_chain(smiles)
+    fsmi = fragmentation_main_side_chain(smiles, label=label)
     if fsmi is None:
         return main_smi
 
     for s in fsmi:
-        if '[3H]' in s:
+        if '[%iH]' % int(label+2) in s:
             try:
-                main_smi = Chem.MolToSmiles(Chem.MolFromSmiles(s.replace('[3H]', '*')))
+                main_smi = Chem.MolToSmiles(Chem.MolFromSmiles(s.replace('[%iH]' % int(label+2), '*')))
             except:
                 utils.radon_print('Cannot convert to canonical SMILES from %s' % smi, level=2)
 
     return main_smi
 
 
-def extract_sidechain(smiles):
+def extract_sidechain(smiles, label=1):
 
     side_smi = []
 
-    fsmi = fragmentation_main_side_chain(smiles)
+    fsmi = fragmentation_main_side_chain(smiles, label=1)
     if fsmi is None:
         return side_smi
 
     for s in fsmi:
-        if '[3H]' not in s:
+        if '[%iH]' % int(label+2) not in s:
             try:
                 side_smi.append(Chem.MolToSmiles(Chem.MolFromSmiles(s)))
             except:
@@ -3821,13 +3872,11 @@ def extract_sidechain(smiles):
     return side_smi
 
 
-def fragmentation_main_side_chain(smiles):
-    if smiles.count('*') != 2:
+def fragmentation_main_side_chain(smiles, label=1):
+    smi = utils.star2h(smiles)
+    if smi.count('[%iH]' % int(label+2)) != 2:
         utils.radon_print('Illegal number of connecting points in SMILES. %s' % smiles, level=2)
         return None
-
-    smi = smiles.replace('[*]', '[3H]')
-    smi = smi.replace('*', '[3H]')
 
     try:
         mol = Chem.MolFromSmiles(smi)
@@ -4061,7 +4110,7 @@ def polyinfo_classifier_list(smi_series, return_flag=False, mp=None):
         mp = utils.cpu_count()
 
     c = utils.picklable_const()
-    args = [[smi, return_flag, c] for smi in smi_series]
+    args = [[None, smi, return_flag, c] for smi in smi_series]
     with confu.ProcessPoolExecutor(max_workers=mp) as executor:
         results = executor.map(_polyinfo_classifier_worker, args)
         res = [r for r in results]
@@ -4069,8 +4118,851 @@ def polyinfo_classifier_list(smi_series, return_flag=False, mp=None):
     return res
 
 
+def polyinfo_classifier_series(smi_series, return_flag=False, mp=None):
+    # class_name = [
+    #     'PHYC', 'PSTR', 'PVNL', 'PACR', 'PHAL', 'PDIE', 'POXI',
+    #     'PSUL', 'PEST', 'PAMD', 'PURT', 'PURA', 'PIMD', 'PANH',
+    #     'PCBN', 'PIMN', 'PSIL', 'PPHS', 'PKTN', 'PSFO', 'PPNL',
+    # ]
+
+    if mp is None:
+        mp = utils.cpu_count()
+
+    c = utils.picklable_const()
+    args = [[idx, smi, return_flag, c] for idx, smi in smi_series.items()]
+    with confu.ProcessPoolExecutor(max_workers=mp) as executor:
+        results = executor.map(_polyinfo_classifier_worker, args)
+        res = [r for r in results]
+
+    df_tmp = smi_series.to_frame()
+    if return_flag:
+        class_dict = []
+        for idx, class_id, pcflag in res:
+            dict_tmp = {}
+            dict_tmp['index'] = idx
+            dict_tmp['polymer_class'] = class_id
+            for k, v in pcflag.items():
+                dict_tmp['class_%s' % k] = v
+            class_dict.append(dict_tmp)
+        df_class = pd.DataFrame(class_dict).set_index('index')
+    else:
+        class_dict = []
+        for idx, class_id in res:
+            dict_tmp = {}
+            dict_tmp['index'] = idx
+            dict_tmp['polymer_class'] = class_id
+            class_dict.append(dict_tmp)
+        df_class = pd.DataFrame(class_dict).set_index('index')
+
+    return df_class
+
+
 def _polyinfo_classifier_worker(args):
-    smi, return_flag, c = args
+    idx, smi, return_flag, c = args
     utils.restore_const(c)
-    return polyinfo_classifier(smi, return_flag=return_flag)
+    if return_flag:
+        class_id, pcflag = polyinfo_classifier(smi, return_flag=True)
+        if idx is None:
+            return class_id, pcflag
+        else:
+            return idx, class_id, pcflag
+    else:
+        class_id = polyinfo_classifier(smi, return_flag=False)
+        if idx is None:
+            return class_id
+        else:
+            return idx, class_id
+
+
+
+
+
+
+
+
+
+
+
+def branch_polymerization_rw(poly_mol, mols, n, confId=0, n_dist='uniform',
+                             copoly_type='random', tacticity='atactic', atac_ratio=0.5, label=None,
+                             position=[2], ds=[1.0], _pf=False, **kwargs):
+    # poly_mol: RDKit Mol object of a polymer
+    # mols: List of RDKit Mol object of substituents
+    # positions: List of labelling index on poly to be connected by substituents
+    # ds: List of degree of substitution (axis=0: mols, axis=1: positions)
+    dt1 = datetime.datetime.now()
+    utils.radon_print('Start poly.branch_polymerization_rw.', level=1)
+    
+    bpoly = utils.deepcopy_mol(poly_mol)
+    
+    if type(mols) is Chem.Mol:
+        mols = [[mols]]
+    elif type(mols) is list:
+        for i, m in enumerate(mols):
+            if type(m) is not list:
+                mols[i] = [m]
+        
+    if len(mols) != len(ds):
+        utils.radon_print('Inconsistency length of mols and ds', level=3)
+        return False
+    
+    if type(ds[0]) is not list:
+        ds = np.array([[x for i in range(len(position))] for x in ds])
+    else:
+        ds = np.array(ds)
+        ds_sum = np.sum(ds, axis=0)
+        if np.any(ds_sum > 1.0):
+            utils.radon_print('Invalid input value for ds. Sum of ds values on each of a substituent position must be <= 1.0', level=3)
+            return False
+            
+    n_position = {}
+    for atom in bpoly.GetAtoms():
+        if atom.GetSymbol() == 'H':
+            l = int(atom.GetIsotope() - 2)
+            if l > 0:
+                if l in n_position.keys():
+                    n_position[l] += 1
+                else:
+                    n_position[l] = 1
+
+    for j, pos in enumerate(position):
+        func_array = []
+        for i in range(len(mols)):
+            func_array.extend([i for x in range(round(n_position[int(pos)]*ds[i,j]))])
+        if len(func_array) < n_position[int(pos)]:
+            func_array.extend([None for x in range(n_position[int(pos)] - len(func_array))])
+        func_array = np.array(func_array)
+        np.random.shuffle(func_array)
+
+        if not _pf:
+            if type(n) is int:
+                n_array = np.full(n, len(func_array))
+            elif type(n) is list and n_dist == 'uniform':
+                n_array = np.random.randint(n[0], n[1], size=len(func_array))
+            elif type(n) is list and n_dist == 'normal':
+                n_array = [round(x) for x in np.random.normal(n[0], n[1], size=len(func_array))]
+            else:
+                utils.radon_print('Invalid input value for n.', level=3)
+
+        for i, idx in enumerate(func_array):
+            if idx is not None:
+                utils.radon_print('Side chain generation. Step %i' % (i+1))
+                if _pf:
+                    m_idx = [0]
+                    chi_inv = [False]
+                    tactic = None
+                else:
+                    m_idx = poly.gen_monomer_array(len(mols[idx]), n_array[i], copoly=copoly_type)
+                    chi_inv, check_chi = poly.gen_chiral_inv_array(mols[idx], m_idx, tacticity=tacticity, atac_ratio=atac_ratio)
+                    if not check_chi:
+                        tactic = None
+                    else:
+                        tactic = tacticity
+
+                # poly.random_walk_polymerization: Low level API for polymerization
+                # 1st arg.: List of using repeating units
+                # 2nd arg.: Arrangement of indices of repeating units in the polymer chain
+                # 3rd arg.: Whether to perform chiral inversion (List of boolean)
+                # label: List of label to be used as connecting points
+                #        [[head label of mol1, tail label of mol1], [head label of mol2, tail label of mol2], ...]
+                bpoly = poly.random_walk_polymerization(mols[idx], m_idx, chi_inv, confId=confId, label=label, init_poly=bpoly,
+                                                        label_init=pos, tacticity=tactic, **kwargs)
+            else:
+                poly.set_linker_flag(bpoly, label=pos)
+                bpoly.GetAtomWithIdx(bpoly.GetIntProp('tail_idx')).SetIsotope(0)
+
+    dt2 = datetime.datetime.now()
+    utils.radon_print('Normal termination of poly.branch_polymerization_rw. Elapsed time = %s' % str(dt2-dt1), level=1)
+
+    return bpoly
+
+
+def post_functionalization_rw(poly_mol, mols, confId=0, position=[2], ds=[1.0], **kwargs):
+    pfpoly = branch_polymerization_rw(poly_mol, mols, 1, confId=confId, position=position, ds=ds, _pf=True, **kwargs)
+    return pfpoly
+
+
+def calc_n_from_num_atoms(mols, natom, ratio=[1.0], label=1, terminal1=None, terminal2=None,
+                          pf={'sub_mols': [], 'position':[2], 'ds':[1.0]}):
+
+    pf_flag = False
+
+    if type(mols) is Chem.Mol:
+        mols = [mols]
+    elif type(mols) is not list:
+        utils.radon_print('Input should be an RDKit Mol object or its List', level=3)
+        return None
+
+    if len(mols) != len(ratio):
+        utils.radon_print('Inconsistency length of mols and ratio', level=3)
+        return None
+
+    ratio = np.array(ratio) / np.sum(ratio)
+
+    if len(pf['sub_mols']) > 0:
+        pf_flag = True
+        sub_mols = pf['sub_mols']
+        position = pf['position']
+        ds = pf['ds']
+
+        if len(sub_mols) != len(ds):
+            utils.radon_print('Inconsistency length of sub_mols and ds', level=3)
+            return False
+    
+        if type(ds[0]) is not list:
+            ds = np.array([[x for i in range(len(position))] for x in ds])
+        else:
+            ds = np.array(ds)
+            ds_sum = np.sum(ds, axis=0)
+            if np.any(ds_sum > 1.0):
+                utils.radon_print('Invalid input value for ds. Sum of ds values on each of a substituent position must be <= 1.0', level=3)
+                return False
+
+        smol_n = []
+        for smol in sub_mols:
+            new_mol = remove_linker_atoms(smol)
+            smol_n.append(new_mol.GetNumAtoms())
+        smol_n = np.array(smol_n)
+
+    mol_n = 0
+    for i, mol in enumerate(mols):
+        new_mol = remove_linker_atoms(mol, label=label)
+        n_atom = new_mol.GetNumAtoms()
+
+        if pf_flag:
+            for j, pos in enumerate(position):
+                pos_n = 0
+                for atom in mol.GetAtoms():
+                    if atom.GetSymbol() == 'H' and atom.GetIsotope() == pos+2:
+                        pos_n += 1
+
+                n_atom += pos_n * np.sum((smol_n-1) * ds[:, j])
+
+        mol_n += n_atom * ratio[i]
+
+    if terminal1 is not None:
+        new_ter1 = remove_linker_atoms(terminal1)
+        ter1_n = new_ter1.GetNumAtoms()
+
+        if pf_flag:
+            for j, pos in enumerate(position):
+                pos_n = 0
+                for atom in terminal1.GetAtoms():
+                    if atom.GetSymbol() == 'H' and atom.GetIsotope() == pos+2:
+                        pos_n += 1
+
+                ter1_n += pos_n * np.sum((smol_n-1) * ds[:, j])
+
+    else:
+        ter1_n = 0
+
+    if terminal2 is not None:
+        new_ter2 = remove_linker_atoms(terminal2)
+        ter2_n = new_ter2.GetNumAtoms()
+
+        if pf_flag:
+            for j, pos in enumerate(position):
+                pos_n = 0
+                for atom in terminal2.GetAtoms():
+                    if atom.GetSymbol() == 'H' and atom.GetIsotope() == pos+2:
+                        pos_n += 1
+
+                ter2_n += pos_n * np.sum((smol_n-1) * ds[:, j])
+
+    elif terminal1 is not None:
+        ter2_n = ter1_n
+    else:
+        ter2_n = 0
+
+    n = round((natom - ter1_n - ter2_n) / mol_n)
+    
+    return n
+
+
+def calc_n_from_mol_weight(mols, mw, ratio=[1.0], terminal1=None, terminal2=None,
+                           pf={'sub_mols': [], 'position':[2], 'ds':[1.0]}):
+    pf_flag = False
+
+    if type(mols) is Chem.Mol:
+        mols = [mols]
+    elif type(mols) is not list:
+        utils.radon_print('Input should be an RDKit Mol object or its List', level=3)
+        return None
+
+    if len(mols) != len(ratio):
+        utils.radon_print('Inconsistency length of mols and ratio', level=3)
+        return None
+
+    ratio = np.array(ratio) / np.sum(ratio)
+
+    if len(pf['sub_mols']) > 0:
+        pf_flag = True
+        sub_mols = pf['sub_mols']
+        position = pf['position']
+        ds = pf['ds']
+
+        if len(sub_mols) != len(ds):
+            utils.radon_print('Inconsistency length of sub_mols and ds', level=3)
+            return False
+        
+        if type(ds[0]) is not list:
+            ds = np.array([[x for i in range(len(position))] for x in ds])
+        else:
+            ds = np.array(ds)
+            ds_sum = np.sum(ds, axis=0)
+            if np.any(ds_sum > 1.0):
+                utils.radon_print('Invalid input value for ds. Sum of ds values on each of a substituent position must be <= 1.0', level=3)
+                return False
+
+        smol_mw = np.array([calc.molecular_weight(smol) for smol in sub_mols])
+
+    mol_mw = 0.0
+    for i, mol in enumerate(mols):
+        m_mw = calc.molecular_weight(mol)
+
+        if pf_flag:
+            for j, pos in enumerate(position):
+                pos_n = 0
+                for atom in mol.GetAtoms():
+                    if atom.GetSymbol() == 'H' and atom.GetIsotope() == pos+2:
+                        pos_n += 1
+
+                m_mw += pos_n * np.sum(smol_mw * ds[:, j])
+
+        mol_mw += m_mw * ratio[i]
+
+    if terminal1 is not None:
+        ter1_mw = calc.molecular_weight(terminal1)
+
+        if pf_flag:
+            for j, pos in enumerate(position):
+                pos_n = 0
+                for atom in terminal1.GetAtoms():
+                    if atom.GetSymbol() == 'H' and atom.GetIsotope() == pos+2:
+                        pos_n += 1
+
+                ter1_mw += pos_n * np.sum(smol_mw * ds[:, j])
+    else:
+        ter1_mw = 0.0
+
+    if terminal2 is not None:
+        ter2_mw = calc.molecular_weight(terminal2)
+
+        if pf_flag:
+            for j, pos in enumerate(position):
+                pos_n = 0
+                for atom in terminal2.GetAtoms():
+                    if atom.GetSymbol() == 'H' and atom.GetIsotope() == pos+2:
+                        pos_n += 1
+
+                ter2_mw += pos_n * np.sum(smol_mw * ds[:, j])
+    elif terminal1 is not None:
+        ter2_mw = ter1_mw
+    else:
+        ter2_mw = 0.0
+
+    n = round((mw - ter1_mw - ter2_mw) / mol_mw)
+    
+    return n
+
+
+
+
+
+
+
+
+
+
+
+
+
+# For ladder polymer extension
+def connect_mols_dev(mol1, mol2, bond_length=1.5, dihedral=np.pi, random_rot=False, dih_type='monomer', set_linker=True, label1=1, label2=1,
+                headhead=False, tailtail=False, confId1=0, confId2=0, res_name_1='RU0', res_name_2='RU0', ladder=False, ladder_label1=2, ladder_label2=3):
+    """
+    poly.connect_mols
+
+    Connect tail atom in mol1 to head atom in mol2
+
+    Args:
+        mol1, mol2: RDkit Mol object (requiring AddHs and 3D position)
+
+    Optional args:
+        bond_length: Bond length of connecting bond (float, angstrome)
+        random_rot: Dihedral angle around connecting bond is rotated randomly (boolean)
+        dihedral: Dihedral angle around connecting bond (float, radian)
+        dih_type: Definition type of dihedral angle (str; monomer, or bond)
+        headhead: Connect with head-to-head
+        tailtail: Connect with tail-to-tail
+        confId1, confId2: Target conformer ID of mol1 and mol2
+        res_name_1, res_name_2: Set residue name of PDB
+
+    Returns:
+        RDkit Mol object
+    """
+
+    if mol1 is None: return mol2
+    if mol2 is None: return mol1
+
+    # Initialize
+    if headhead: set_linker_flag(mol1, reverse=True, label=label1)
+    elif set_linker: set_linker_flag(mol1, label=label1)
+    if tailtail and not headhead: set_linker_flag(mol2, reverse=True, label=label2)
+    elif set_linker: set_linker_flag(mol2, label=label2)
+
+    if mol1.GetIntProp('tail_idx') < 0 or mol1.GetIntProp('tail_ne_idx') < 0:
+        utils.radon_print('Cannot connect_mols because mol1 does not have a tail linker atom.', level=2)
+        return mol1
+    elif mol2.GetIntProp('head_idx') < 0 or mol2.GetIntProp('head_ne_idx') < 0:
+        utils.radon_print('Cannot connect_mols because mol2 does not have a head linker atom.', level=2)
+        return mol1
+
+    mol1_n = mol1.GetNumAtoms()
+    mol1_coord = mol1.GetConformer(confId1).GetPositions()
+    mol2_coord = mol2.GetConformer(confId2).GetPositions()
+    mol1_tail_vec = mol1_coord[mol1.GetIntProp('tail_ne_idx')] - mol1_coord[mol1.GetIntProp('tail_idx')]
+    mol2_head_vec = mol2_coord[mol2.GetIntProp('head_ne_idx')] - mol2_coord[mol2.GetIntProp('head_idx')]
+    charge_list = ['AtomicCharge', '_GasteigerCharge', 'RESP', 'ESP', 'MullikenCharge', 'LowdinCharge']
+    #bd1type = mol1.GetBondBetweenAtoms(mol1.GetIntProp('tail_idx'), mol1.GetIntProp('tail_ne_idx')).GetBondTypeAsDouble()
+    #bd2type = mol2.GetBondBetweenAtoms(mol2.GetIntProp('head_idx'), mol2.GetIntProp('head_ne_idx')).GetBondTypeAsDouble()
+
+    # Rotation mol2 to align bond vectors of head and tail
+    angle = calc.angle_vec(mol1_tail_vec, mol2_head_vec, rad=True)
+    center = mol2_coord[mol2.GetIntProp('head_ne_idx')]
+    if angle == 0:
+        mol2_coord_rot = (mol2_coord - center) * -1 + center
+    elif angle == np.pi:
+        mol2_coord_rot = mol2_coord
+    else:
+        vcross = np.cross(mol1_tail_vec, mol2_head_vec)
+        mol2_coord_rot = calc.rotate_rod(mol2_coord, vcross, (np.pi-angle), center=center)
+
+    # Translation mol2
+    trans = mol1_coord[mol1.GetIntProp('tail_ne_idx')] - ( bond_length * mol1_tail_vec / np.linalg.norm(mol1_tail_vec) )
+    mol2_coord_rot = mol2_coord_rot + trans - mol2_coord_rot[mol2.GetIntProp('head_ne_idx')]
+
+    # Rotation mol2 around new bond
+    if ladder:
+        head_ladder_idx, head_ne_ladder_idx = None, None
+        tail_ladder_idx, tail_ne_ladder_idx = None, None
+
+        for atom in mol1.GetAtoms():
+            if atom.GetSymbol() == 'H' and atom.GetIsotope() == ladder_label1 + 2:
+                tail_ladder_idx = atom.GetIdx()                
+                tail_ne_ladder_idx = atom.GetNeighbors()[0].GetIdx()
+                break
+        if tail_ladder_idx is None:
+            utils.radon_print('Can not find connection tail atom for a ladder polymer. ladder_label1=%i' % int(ladder_label1), level=3)
+        for atom in mol2.GetAtoms():
+            if atom.GetSymbol() == 'H' and atom.GetIsotope() == ladder_label2 + 2:
+                head_ladder_idx = atom.GetIdx()
+                head_ne_ladder_idx = atom.GetNeighbors()[0].GetIdx()
+                break
+        if head_ladder_idx is None:
+            utils.radon_print('Can not find connection head atom for a ladder polymer. ladder_label2=%i' % int(ladder_label2), level=3)
+
+        dih = calc.dihedral_coord(mol1_coord[tail_ladder_idx], mol1_coord[mol1.GetIntProp('tail_ne_idx')],
+                                  mol2_coord_rot[mol2.GetIntProp('head_ne_idx')], mol2_coord_rot[head_ladder_idx], rad=True)
+        dihedral = np.random.uniform(-np.pi, np.pi) / 6
+
+    elif random_rot == True:
+        dih = np.random.uniform(-np.pi, np.pi)
+        
+    else:
+        if dih_type == 'monomer':
+            dih = calc.dihedral_coord(mol1_coord[mol1.GetIntProp('head_idx')], mol1_coord[mol1.GetIntProp('tail_ne_idx')],
+                                      mol2_coord_rot[mol2.GetIntProp('head_ne_idx')], mol2_coord_rot[mol2.GetIntProp('tail_idx')], rad=True)
+        elif dih_type == 'bond':
+            path1 = Chem.GetShortestPath(mol1, mol1.GetIntProp('head_idx'), mol1.GetIntProp('tail_idx'))
+            path2 = Chem.GetShortestPath(mol2, mol2.GetIntProp('head_idx'), mol2.GetIntProp('tail_idx'))
+            dih = calc.dihedral_coord(mol1_coord[path1[-3]], mol1_coord[path1[-2]],
+                                      mol2_coord_rot[path2[1]], mol2_coord_rot[path2[2]], rad=True)
+        else:
+            utils.radon_print('Illegal option of dih_type=%s.' % str(dih_type), level=3)
+    mol2_coord_rot = calc.rotate_rod(mol2_coord_rot, -mol1_tail_vec, (dihedral-dih), center=mol2_coord_rot[mol2.GetIntProp('head_ne_idx')])
+
+    # Combining mol1 and mol2
+    mol = combine_mols(mol1, mol2, res_name_1=res_name_1, res_name_2=res_name_2)
+
+    # Set atomic coordinate
+    for i in range(mol2.GetNumAtoms()):
+        mol.GetConformer(0).SetAtomPosition(i+mol1_n, Geom.Point3D(mol2_coord_rot[i, 0], mol2_coord_rot[i, 1], mol2_coord_rot[i, 2]))
+
+    # Set atomic charge
+    for charge in charge_list:
+        if not mol.GetAtomWithIdx(0).HasProp(charge) or not mol.GetAtomWithIdx(mol.GetNumAtoms()-1).HasProp(charge):
+            continue
+        head_charge = mol.GetAtomWithIdx(mol2.GetIntProp('head_idx') + mol1_n).GetDoubleProp(charge)
+        head_ne_charge = mol.GetAtomWithIdx(mol2.GetIntProp('head_ne_idx') + mol1_n).GetDoubleProp(charge)
+        tail_charge = mol.GetAtomWithIdx(mol1.GetIntProp('tail_idx')).GetDoubleProp(charge)
+        tail_ne_charge = mol.GetAtomWithIdx(mol1.GetIntProp('tail_ne_idx')).GetDoubleProp(charge)
+        mol.GetAtomWithIdx(mol2.GetIntProp('head_ne_idx') + mol1_n).SetDoubleProp(charge, head_charge+head_ne_charge)
+        mol.GetAtomWithIdx(mol1.GetIntProp('tail_ne_idx')).SetDoubleProp(charge, tail_charge+tail_ne_charge)
+        if ladder:
+            head_ladder_charge = mol.GetAtomWithIdx(head_ladder_idx + mol1_n).GetDoubleProp(charge)
+            head_ne_ladder_charge = mol.GetAtomWithIdx(head_ne_ladder_idx + mol1_n).GetDoubleProp(charge)
+            tail_ladder_charge = mol.GetAtomWithIdx(tail_ladder_idx).GetDoubleProp(charge)
+            tail_ne_ladder_charge = mol.GetAtomWithIdx(tail_ne_ladder_idx).GetDoubleProp(charge)
+            mol.GetAtomWithIdx(head_ne_ladder_idx + mol1_n).SetDoubleProp(charge, head_ladder_charge+head_ne_ladder_charge)
+            mol.GetAtomWithIdx(tail_ne_ladder_idx).SetDoubleProp(charge, tail_ladder_charge+tail_ne_ladder_charge)
+
+    # Delete linker atoms and bonds
+    del_idx1 = mol1.GetIntProp('tail_idx')
+    del_idx2 = mol2.GetIntProp('head_idx') + mol1_n - 1
+    mol = utils.remove_atom(mol, del_idx1)
+    mol = utils.remove_atom(mol, del_idx2)
+
+    # Add a new bond
+    tail_ne_idx = mol1.GetIntProp('tail_ne_idx')
+    head_ne_idx = mol2.GetIntProp('head_ne_idx') + mol1_n - 1
+    if del_idx1 < tail_ne_idx: tail_ne_idx -= 1
+    if del_idx2 < head_ne_idx: head_ne_idx -= 1
+    mol = utils.add_bond(mol, tail_ne_idx, head_ne_idx, order=Chem.rdchem.BondType.SINGLE)
+    new_bond = mol.GetBondBetweenAtoms(tail_ne_idx, head_ne_idx)
+    new_bond.SetBoolProp('new_bond', True)
+
+    if ladder:
+        del_ladder_idx1 = tail_ladder_idx
+        del_ladder_idx2 = head_ladder_idx + mol1_n - 2
+        if del_idx1 < del_ladder_idx1: del_ladder_idx1 -= 1
+        if del_idx2 < del_ladder_idx2: del_ladder_idx2 -= 1
+        mol = utils.remove_atom(mol, del_ladder_idx1)
+        mol = utils.remove_atom(mol, del_ladder_idx2)
+
+        tail_ladder_new_idx = tail_ne_ladder_idx
+        head_ladder_new_idx = head_ne_ladder_idx + mol1_n - 2
+        if del_idx1 < tail_ladder_new_idx: tail_ladder_new_idx -= 1
+        if del_idx2 < head_ladder_new_idx: head_ladder_new_idx -= 1
+        if del_ladder_idx1 < tail_ladder_new_idx: tail_ladder_new_idx -= 1
+        if del_ladder_idx2 < head_ladder_new_idx: head_ladder_new_idx -= 1
+        mol = utils.add_bond(mol, tail_ladder_new_idx, head_ladder_new_idx, order=Chem.rdchem.BondType.SINGLE)
+        new_bond = mol.GetBondBetweenAtoms(tail_ladder_new_idx, head_ladder_new_idx)
+        new_bond.SetBoolProp('new_bond', True)
+
+    #if bd1type == 2.0 or bd2type == 2.0:
+    #    mol = utils.add_bond(mol, tail_ne_idx, head_ne_idx, order=Chem.rdchem.BondType.DOUBLE)
+    #elif bd1type == 3.0 or bd2type == 3.0:
+    #    mol = utils.add_bond(mol, tail_ne_idx, head_ne_idx, order=Chem.rdchem.BondType.TRIPLE)
+    #else:
+    #    mol = utils.add_bond(mol, tail_ne_idx, head_ne_idx, order=Chem.rdchem.BondType.SINGLE)
+
+    # Finalize
+    Chem.SanitizeMol(mol)
+    #set_linker_flag(mol)
+
+    # Update linker_flag
+    mol.GetAtomWithIdx(tail_ne_idx).SetBoolProp('tail_neighbor', False)
+    mol.GetAtomWithIdx(head_ne_idx).SetBoolProp('head_neighbor', False)
+
+    head_idx = mol1.GetIntProp('head_idx')
+    if del_idx1 < head_idx: head_idx -= 1
+
+    head_ne_idx = mol1.GetIntProp('head_ne_idx')
+    if del_idx1 < head_ne_idx: head_ne_idx -= 1
+
+    tail_idx = mol2.GetIntProp('tail_idx') + mol1_n - 1
+    if del_idx2 < tail_idx: tail_idx -= 1
+
+    tail_ne_idx = mol2.GetIntProp('tail_ne_idx') + mol1_n - 1
+    if del_idx2 < tail_ne_idx: tail_ne_idx -= 1
+
+    mol.SetIntProp('head_idx', head_idx)
+    mol.SetIntProp('head_ne_idx', head_ne_idx)
+    mol.SetIntProp('tail_idx', tail_idx)
+    mol.SetIntProp('tail_ne_idx', tail_ne_idx)
+
+    return mol
+
+
+
+def random_walk_polymerization_dev(mols, m_idx, chi_inv, start_num=0, init_poly=None, headhead=False, confId=0,
+            dist_min=0.7, retry=100, rollback=5, rollback_shaking=False, retry_step=200, retry_opt_step=0, tacticity=None,
+            res_name_init='INI', res_name=None, label=None, label_init=1, ff=None, work_dir=None, omp=1, mpi=0, gpu=0, mp_idx=None,
+            ladder=False, ladder_label1=2, ladder_label2=3):
+    """
+    poly.random_walk_polymerization
+
+    Polymerization of RDkit Mol object by self-avoiding random walk
+
+    Args:
+        mols: list of RDkit Mol object
+        m_idx: Input array of repeating units by index number of mols
+        chi_inv: Input boolean array of chiral inversion
+
+    Optional args:
+        start_num: Index number of m_idx of starting point
+        init_poly: Perform additional polymerization for init_poly (RDkit Mol object)
+        headhead: Connect monomer unit by head-to-head
+        confId: Target conformer ID
+        dist_min: (float, angstrom)
+        retry: Number of retry for this function when generating unsuitable structure (int)
+        rollback: Number of rollback step when retry random_walk_polymerization (int)
+        retry_step: Number of retry for a random-walk step when generating unsuitable structure (int)
+        retry_opt_step: Number of retry for a random-walk step with optimization when generating unsuitable structure (int)
+        work_dir: Work directory path of LAMMPS (str, requiring when opt is LAMMPS)
+        ff: Force field object (requiring when opt is LAMMPS)
+        omp: Number of threads of OpenMP in LAMMPS (int)
+        mpi: Number of MPI process in LAMMPS (int)
+        gpu: Number of GPU in LAMMPS (int)
+
+    Returns:
+        Rdkit Mol object
+    """
+    utils.radon_print('Start poly.random_walk_polymerization.')
+
+    if len(m_idx) != len(chi_inv):
+        utils.radon_print('Inconsistency length of m_idx and chi_inv', level=3)
+    if len(mols) <= max(m_idx):
+        utils.radon_print('Illegal index number was found in m_idx', level=3)
+
+    mols_copy = []
+    mols_inv = []
+    has_ring = False
+    retry_flag = False
+    tri_coord = None
+    bond_coord = None    
+    poly = None
+    poly_copy = [None]
+
+    if res_name is None:
+        res_name = ['RU%s' % const.pdb_id[i] for i in range(len(mols))]
+    else:
+        if len(mols) != len(res_name):
+            utils.radon_print('Inconsistency length of mols and res_name', level=3)
+
+    if label is None:
+        label = [[1, 1] for x in range(len(mols))]
+    else:
+        if len(mols) != len(label):
+            utils.radon_print('Inconsistency length of mols and label', level=3)
+
+    if type(init_poly) == Chem.Mol:
+        poly = utils.deepcopy_mol(init_poly)
+        set_linker_flag(poly, label=label_init)
+        poly_copy = []
+        sssr_tmp = Chem.GetSSSR(poly)
+        if type(sssr_tmp) is int:
+            if sssr_tmp > 0:
+                has_ring = True
+        elif len(sssr_tmp) > 0:  # For RDKit version >= 2022.09
+            has_ring = True
+
+    for i, mol in enumerate(mols):
+        set_linker_flag(mol, label=label[i][0])
+        mols_copy.append(utils.deepcopy_mol(mol))
+        mols_inv.append(calc.mirror_inversion_mol(mol))
+        sssr_tmp = Chem.GetSSSR(mol)
+        if type(sssr_tmp) is int:
+            if sssr_tmp > 0:
+                has_ring = True
+        elif len(sssr_tmp) > 0:  # For RDKit version >= 2022.09
+            has_ring = True
+
+    for i in tqdm(range(start_num, len(m_idx)), desc='[Polymerization]', disable=const.tqdm_disable):
+        dmat = None
+    
+        if chi_inv[i]:
+            mol_c = mols_inv[m_idx[i]]
+        else:
+            mol_c = mols_copy[m_idx[i]]
+
+        if i == 0:
+            res_name_1 = res_name_init
+        else:
+            res_name_1 = res_name[m_idx[i-1]]
+
+        if type(poly) is Chem.Mol:
+            poly_copy.append(utils.deepcopy_mol(poly))
+        else:
+            poly_copy.append(utils.deepcopy_mol(mol_c))
+
+        if len(poly_copy) > rollback:
+            del poly_copy[0]
+
+        for r in range(retry_step*(1+retry_opt_step)):
+            check_3d = False
+            if i > 0:
+                label1 = label[m_idx[i-1]][1]
+            elif type(init_poly) == Chem.Mol:
+                label1 = label_init
+            else:
+                label1 = 1
+
+            if headhead and i % 2 == 0:
+                poly = connect_mols_dev(poly, mol_c, tailtail=True, random_rot=True, set_linker=True,
+                            confId2=confId, res_name_1=res_name_1, res_name_2=res_name[m_idx[i]],
+                            label1=label1, label2=label[m_idx[i]][1],
+                            ladder=ladder, ladder_label1=ladder_label1, ladder_label2=ladder_label2)
+            else:
+                poly = connect_mols_dev(poly, mol_c, random_rot=True, set_linker=True,
+                            confId2=confId, res_name_1=res_name_1, res_name_2=res_name[m_idx[i]],
+                            label1=label1, label2=label[m_idx[i]][0],
+                            ladder=ladder, ladder_label1=ladder_label1, ladder_label2=ladder_label2)
+
+            if i == 0 and init_poly is None:
+                break
+
+            if dmat is None and dist_min > 1.0:
+                # This deepcopy avoids a bug of RDKit
+                dmat = Chem.GetDistanceMatrix(utils.deepcopy_mol(poly))
+
+            if r % retry_step == 0 and r > 0:
+                if MD_avail:
+                    utils.radon_print('Molecular geometry shaking by a short time and high temperature MD simulation')
+                    if ff is None:
+                        ff = GAFF2_mod()
+                    if poly.GetAtomWithIdx(0).HasProp('AtomicCharge') and poly.GetAtomWithIdx(poly.GetNumAtoms()-1).HasProp('AtomicCharge'):
+                        ff.ff_assign(poly)
+                    else:
+                        ff.ff_assign(poly, charge='gasteiger')
+                    poly, _ = md.quick_rw(poly, work_dir=work_dir, omp=omp, mpi=mpi, gpu=gpu, idx=mp_idx)
+                else:
+                    utils.radon_print('Molecular geometry optimization by RDKit')
+                    AllChem.MMFFOptimizeMolecule(poly, maxIters=50, mmffVariant='MMFF94s', nonBondedThresh=3.0, confId=0)
+                check_3d = check_3d_structure_poly(poly, mol_c, dmat, dist_min=dist_min, check_bond_length=True, tacticity=tacticity)
+                tri_coord = None
+                bond_coord = None
+            else:
+                check_3d = check_3d_structure_poly(poly, mol_c, dmat, dist_min=dist_min, check_bond_length=False)
+
+            if check_3d and has_ring:
+                check_3d, tri_coord_new, bond_coord_new = check_3d_bond_ring_intersection(poly, mon=mol_c,
+                                                                    tri_coord=tri_coord, bond_coord=bond_coord)
+
+            if check_3d:
+                if has_ring:
+                    tri_coord = tri_coord_new
+                    bond_coord = bond_coord_new
+                break
+            elif r < retry_step * (1 + retry_opt_step) - 1:
+                poly = utils.deepcopy_mol(poly_copy[-1]) if type(poly_copy[-1]) is Chem.Mol else None
+                if r == 0 or (r+1) % 100 == 0:
+                    utils.radon_print('Retry random walk step %i, %i/%i' % (i+1, r+1, retry_step*(1+retry_opt_step)))
+            else:
+                retry_flag = True
+                utils.radon_print(
+                    'Reached maximum number of retrying step in random walk step %i of poly.random_walk_polymerization.' % (i+1),
+                    level=1)
+
+        if retry_flag: break
+
+    if retry_flag:
+        if retry <= 0:
+            utils.radon_print(
+                'poly.random_walk_polymerization is failure because reached maximum number of rollback times in random walk step %i.' % (i+1),
+                level=3)
+        else:
+            utils.radon_print(
+                'Retry poly.random_walk_polymerization and rollback %i steps. Remaining %i times.' % (len(poly_copy), retry),
+                level=1)
+            retry -= 1
+            start_num = i-len(poly_copy)+1
+            if start_num > 0:
+                label_init = label[m_idx[start_num-1]][1]
+            rb_poly = poly_copy[0]
+
+            if MD_avail and rollback_shaking and type(rb_poly) is Chem.Mol:
+                utils.radon_print('Molecular geometry shaking by a short time and high temperature MD simulation')
+                if ff is None:
+                    ff = GAFF2_mod()
+                if rb_poly.GetAtomWithIdx(0).HasProp('AtomicCharge') and poly.GetAtomWithIdx(poly.GetNumAtoms()-1).HasProp('AtomicCharge'):
+                    ff.ff_assign(rb_poly)
+                else:
+                    ff.ff_assign(rb_poly, charge='gasteiger')
+                rb_poly, _ = md.quick_rw(rb_poly, work_dir=work_dir, omp=omp, mpi=mpi, gpu=gpu)
+
+            poly = random_walk_polymerization_dev(
+                mols, m_idx, chi_inv, start_num=start_num, init_poly=rb_poly, headhead=headhead, confId=confId,
+                dist_min=dist_min, retry=retry, rollback=rollback, retry_step=retry_step, retry_opt_step=retry_opt_step, tacticity=tacticity,
+                res_name_init=res_name_init, res_name=res_name, label=label, label_init=label_init,
+                ff=ff, work_dir=work_dir, omp=omp, mpi=mpi, gpu=gpu,
+                ladder=ladder, ladder_label1=ladder_label1, ladder_label2=ladder_label2
+            )
+            
+    return poly
+
+
+
+def polymerize_ladder_rw(mol, n, init_poly=None, headhead=False, confId=0, tacticity='atactic', atac_ratio=0.5,
+            dist_min=0.7, retry=100, rollback=5, rollback_shaking=False, retry_step=200, retry_opt_step=0, ter1=None, ter2=None,
+            label=None, label_ter1=1, label_ter2=1, res_name='RU0', ff=None, work_dir=None, omp=0, mpi=1, gpu=0, mp_idx=None,
+            ladder_label1=2, ladder_label2=3):
+    """
+    poly.polymerize_ladder_rw
+
+    Homo-polymerization of RDkit Mol object by self-avoiding random walk for ladder polymers
+
+    Args:
+        mol: RDkit Mol object
+        n: Polymerization degree (int)
+
+    Optional args:
+        init_poly: polymerize_rw perform additional polymerization for init_poly (RDkit Mol object)
+        headhead: Connect monomer unit by head-to-head
+        confId: Target conformer ID
+        tacticity: isotactic, syndiotactic, or atactic
+        atac_ratio: Chiral inversion ration for atactic polymer
+        dist_min: (float, angstrom)
+        retry: Number of retry for this function when generating unsuitable structure (int)
+        rollback: Number of rollback step when retry polymerize_rw (int)
+        retry_step: Number of retry for a random-walk step when generating unsuitable structure (int)
+        retry_opt_step: Number of retry for a random-walk step with optimization when generating unsuitable structure (int)
+        work_dir: Work directory path of LAMMPS (str, requiring when opt is LAMMPS)
+        ff: Force field object (requiring when opt is LAMMPS)
+        omp: Number of threads of OpenMP in LAMMPS (int)
+        mpi: Number of MPI process in LAMMPS (int)
+        gpu: Number of GPU in LAMMPS (int)
+
+    Returns:
+        Rdkit Mol object
+    """
+    dt1 = datetime.datetime.now()
+    utils.radon_print('Start poly.polymerize_rw.', level=1)
+
+    m_idx = gen_monomer_array(1, n)
+    chi_inv, check_chi = gen_chiral_inv_array([mol], m_idx, init_poly=init_poly, tacticity=tacticity, atac_ratio=atac_ratio)
+    if not check_chi:
+        tacticity = None
+
+    if type(ter1) is Chem.Mol:
+        if ter2 is None:
+            ter2 = ter1
+        mols = [mol, ter1, ter2]
+        res_name = [res_name, 'TU0', 'TU1']
+        m_idx = [1, *m_idx, 2]
+        chi_inv = [False, *chi_inv, False]
+        if label is None:
+            label = [1, 1]
+        label = [label, [label_ter1, label_ter1], [label_ter2, label_ter2]]
+    else:
+        mols = [mol]
+        res_name = [res_name]
+        if label is not None:
+            label = [label]
+
+    poly = random_walk_polymerization_dev(
+        mols, m_idx, chi_inv, start_num=0, init_poly=init_poly, headhead=headhead, confId=confId,
+        dist_min=dist_min, retry=retry, rollback=rollback, rollback_shaking=rollback_shaking, retry_step=retry_step, retry_opt_step=retry_opt_step,
+        tacticity=tacticity, res_name=res_name, label=label, ff=ff, work_dir=work_dir, omp=omp, mpi=mpi, gpu=gpu, mp_idx=mp_idx,
+        ladder=True, ladder_label1=ladder_label1, ladder_label2=ladder_label2
+    )
+
+    if type(ter1) is Chem.Mol:
+        set_terminal_idx(poly)
+    dt2 = datetime.datetime.now()
+    utils.radon_print('Normal termination of poly.polymerize_rw. Elapsed time = %s' % str(dt2-dt1), level=1)
+
+    return poly
+
+def mol_from_amino_residues(residues):
+
+    f_dir = os.path.dirname(os.path.realpath(__file__))
+
+    mols = [utils.mol_from_pdb(os.path.join(f_dir, 'pdb', res + '.pdb'), charge=True)
+            for res in residues]
+
+    mol = block_copolymerize_mols(mols, 1, tacticity='isotactic')
+    
+    return mol
 

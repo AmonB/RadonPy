@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Use of this source code is governed by a BSD-3-style
+#  license that can be found in the LICENSE file.
+
+__version__ = '0.1.3'
+
+import matplotlib
+matplotlib.use('Agg')
+
+import pandas as pd
+import os
+
+from radonpy.core import utils
+from radonpy.sim import helper
+from radonpy.sim.preset import tg
+
+
+if __name__ == '__main__':
+    data = {
+        'DBID': os.environ.get('RadonPy_DBID'),
+        **helper.get_version(),
+        'preset_tg_ver': tg.__version__,
+    }
+    
+    omp = int(os.environ.get('RadonPy_OMP', 0))
+    mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
+    gpu = int(os.environ.get('RadonPy_GPU', 0))
+    rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
+    rst_data_file = os.environ.get('RadonPy_LAMMPS_Data_File', None)
+    tg_dump = os.environ.get('RadonPy_TG_Dump', False)
+    
+    work_dir = './%s' % data['DBID']
+    save_dir = os.path.join(work_dir, 'analyze')
+    io = helper.IO_Helper(work_dir, save_dir)
+    
+    # Load results.csv or input_data.csv file
+    data = io.load_md_csv(data)
+
+    # Load pickle file or LAMMPS data file
+    mol = io.load_md_obj(rst_pickle_file=rst_pickle_file)
+
+    # Tg calculation
+    tgmd = tg.TGMD(mol, work_dir=work_dir)
+    mol, tg_results = tgmd.exec(temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=8e3, intel='off', opt='off')
+
+    # Reload MD csv data
+    data = io.load_md_csv(data)
+
+    #tg_results is the dictionary including results of TGMD
+    data.update(tg_results)
+
+    # Data output after TGMD
+    io.output_md_data(data)
+

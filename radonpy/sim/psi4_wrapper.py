@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -21,7 +21,7 @@ import resp
 
 from ..core import const, calc, utils
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 if LooseVersion(psi4.__version__) >= LooseVersion('1.4'):
     import qcengine
@@ -261,6 +261,7 @@ class Psi4w():
             'STEP_TYPE': geom_algorithm,
             'OPTKING__ENSURE_BT_CONVERGENCE': True,
             'DYNAMIC_LEVEL': dynamic_level,
+#            'PRINT_OPT_PARAMS': True,
         }
 
         # Frozen coordinates
@@ -361,6 +362,7 @@ class Psi4w():
             'STEP_TYPE': geom_algorithm,
             'OPTKING__ENSURE_BT_CONVERGENCE': True,
             'DYNAMIC_LEVEL': dynamic_level,
+#            'PRINT_OPT_PARAMS': True,
         }
 
         if len(atoms) == 2:
@@ -678,18 +680,29 @@ class Psi4w():
         # Function override to avoid LinAlgError in calculation of inverse matrix
         resp.espfit.esp_solve = _new_esp_solve
 
+        ptab = Chem.GetPeriodicTable()
+
         # Avoid a bug in RESP 0.8
         if LooseVersion(resp.__version__) >= LooseVersion('0.8'):
-            psi4.qcdb.parker._expected_bonds.update({'CL':1, 'BR':1, 'I':1}) 
+            # Make a dict of expected bonds
+            defv_dict = {ptab.GetElementSymbol(n).upper(): ptab.GetDefaultValence(n) if ptab.GetDefaultValence(n) >= 0 else 0 for n in range(1, 119)}
+            psi4.qcdb.parker._expected_bonds = {**defv_dict, **psi4.qcdb.parker._expected_bonds} 
 
         pmol = self._init_psi4(output='./%s_psi4_resp.log' % self.name)
+
+        # Make a dict of vdW radii
+        except_list = set([1, 6, 7, 8, 9, 15, 16, 17])  # H, C, N, O, F, P, S, Cl
+        rvdw_dict = {ptab.GetElementSymbol(n): ptab.GetRvdw(n) for n in range(1, 119) if n not in except_list}
         # https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
+        rvdw_dict['Br'] = 1.978
+        rvdw_dict['I'] = 2.094
+
         options = {'VDW_SCALE_FACTORS'  : [1.4, 1.6, 1.8, 2.0],
                    'VDW_POINT_DENSITY'  : 20.0,
                    'RESP_A'             : 0.0005,
                    'RESP_B'             : 0.1,
-                   'RADIUS'             : {'Br':1.978, 'I':2.094},
-                   'VDW_RADII'          : {'Br':1.978, 'I':2.094},
+                   'RADIUS'             : rvdw_dict,
+                   'VDW_RADII'          : rvdw_dict,
                    'METHOD_ESP'         : self.method,
                    'BASIS_ESP'          : 'radonpy_basis'
                    }

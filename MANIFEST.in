@@ -3,3 +3,4 @@ include README.md
 include requirements.txt
 recursive-include radonpy *.py
 recursive-include radonpy/ff/ff_dat *.json
+recursive-include radonpy/core/pdb *.pdb

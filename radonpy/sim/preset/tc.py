@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -16,7 +16,7 @@ from rdkit import Geometry as Geom
 from ...core import poly, utils, calc, const
 from .. import lammps, preset
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 
 class NEMD_MP(preset.Preset):
@@ -121,6 +121,25 @@ class NEMD_MP(preset.Preset):
         lmp.make_dat(self.mol, file_name=self.dat_file, confId=confId)
         seed = np.random.randint(1000, 999999)
 
+        cmap_fix = ''
+        cmap_unfix = ''
+        cmap_read_data = ''
+        if self.mol is not None and hasattr(self.mol, 'cmaps'):
+            cmap_fix       = 'fix cmap0 all cmap cmap.data'
+            cmap_unfix     = 'unfix cmap0'
+            cmap_read_data = 'fix cmap0 crossterm CMAP'
+
+        all_nowater = 'all'
+        tip_lines = ''
+        tip_types = lmp.get_tip_types(self.mol)
+        if len(tip_types) > 0:
+            tip_types = [str(i) for i in tip_types]
+            tip_lines  = 'group water0 type ' + " ".join(tip_types) + "\n"
+            tip_lines += 'group nowater0 subtract all water0\n'
+            tip_lines += 'fix rigid1 water0 rigid/small molecule\n'
+            tip_lines += 'neigh_modify exclude molecule/intra water0\n'
+            all_nowater = 'nowater0'
+            
         # Make input file
         in_strings  = 'variable        axis    string %s\n' % (self.axis)
         in_strings += 'variable        rep     equal  %i\n' % (rep)
@@ -150,6 +169,10 @@ class NEMD_MP(preset.Preset):
         in_strings += 'variable        pairst  string %s\n' % (self.pair_style)
         in_strings += 'variable        cutoff1 string %s\n' % (self.cutoff_in)
         in_strings += 'variable        cutoff2 string %s\n' % (self.cutoff_out)
+        in_strings += 'variable        bondst  string %s\n' % (self.bond_style)
+        in_strings += 'variable        anglest string %s\n' % (self.angle_style)
+        in_strings += 'variable        dihedst string %s\n' % (self.dihedral_style)
+        in_strings += 'variable        improst string %s\n' % (self.improper_style)
         in_strings += '##########################################################\n'
 
         in_strings += """
@@ -159,10 +182,10 @@ units           real
 atom_style      full
 boundary        p p p
 
-bond_style      harmonic  
-angle_style     harmonic
-dihedral_style  fourier
-improper_style  cvff
+bond_style      ${bondst}  
+angle_style     ${anglest}
+dihedral_style  ${dihedst}
+improper_style  ${improst}
 
 pair_style      ${pairst} ${cutoff1} ${cutoff2}
 pair_modify     mix arithmetic
@@ -171,7 +194,8 @@ neighbor        2.0 bin
 neigh_modify    delay 0 every 1 check yes
 kspace_style    pppm 1e-6
 
-read_data       ${dataf}
+%s
+read_data       ${dataf} %s
 
 thermo_modify   flush yes
 thermo          1000
@@ -185,6 +209,8 @@ variable        NA     equal 6.02214076*1.0e23
 variable        kcal2j equal 4.184*1000
 variable        ang2m  equal 1.0e-10
 variable        fs2s   equal 1.0e-15
+
+%s
 
 if "${axis} == x" then &
   "replicate    ${rep} ${repo} ${repo}" &
@@ -205,6 +231,8 @@ elif "${axis} == z" &
   "variable     Jarea equal  lx*ly" &
   "variable     idx   equal  3"
 
+%s
+
 variable        Nfreq   equal  ${exchg}/${Nevery}       # Number of data points to compute temperature during exchange interval 
 variable        invslab equal  1/${slab}
 variable        width   equal  (${ahi}-${alo})/${slab}
@@ -224,14 +252,14 @@ elif "${axis} == z" &
   "region       rhalf   block    INF  INF  INF  INF  ${rlo}  ${rhi}  units box"
 ##########################################################
 
-
+%s
 
 ##########################################################
 ## Initial equilibration to control temperature
 ##########################################################
 velocity        all create ${Ttemp} ${seed} mom yes rot yes dist gaussian
 timestep        ${TimeSt}
-fix             NVT all nvt temp ${Ttemp} ${Ttemp} 100
+fix             NVT %s nvt temp ${Ttemp} ${Ttemp} 100
 
 thermo_style    custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
 thermo_modify   flush yes
@@ -247,7 +275,7 @@ reset_timestep  0
 ##########################################################
 ## NEMD with kinetic energy exchange (RNEMD)
 ##########################################################
-fix             NVE all nve
+fix             NVE %s nve
 fix             mp  all thermal/conductivity ${exchg} ${axis} ${slab}
 
 # Generate temperature profile of layers
@@ -268,7 +296,8 @@ thermo          ${exchg}
 run             ${NStep}
 
 
-"""
+""" % (cmap_fix, cmap_read_data, cmap_unfix, cmap_fix, tip_lines,
+       all_nowater, all_nowater)
 
         if decomp:
             in_strings += """
@@ -420,7 +449,7 @@ quit
         return True
 
 
-    def analyze(self):
+    def analyze(self, ignore_log=[], **kwargs):
 
         anal = NEMD_MP_Analyze(
             axis = self.axis,
@@ -430,7 +459,9 @@ quit
             rJprof_file  = os.path.join(self.work_dir, self.rJprof_file),
             traj_file = os.path.join(self.work_dir, self.xtc_file),
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
-            dat_file  = os.path.join(self.work_dir, self.dat_file)
+            dat_file  = os.path.join(self.work_dir, self.dat_file),
+            ignore_log = ignore_log,
+            **kwargs
         )
 
         return anal
@@ -440,7 +471,7 @@ quit
 class NEMD_MP_Analyze(lammps.Analyze):
     def __init__(self, axis='x', prefix='', **kwargs):
         kwargs['log_file'] = kwargs.get('log_file', '%snemd_TC-MP_%s.log' % (prefix, axis))
-        super().__init__(**kwargs)
+        super().__init__(ignore_log=ignore_log, **kwargs)
         self.axis = axis
         self.tprof_file = kwargs.get('tprof_file', '%sslabtemp_%s.profile' % (prefix, axis))
         self.lJprof_file = kwargs.get('lJprof_file', '%sheatflux_left_%s.profile' % (prefix, axis))
@@ -794,6 +825,25 @@ class NEMD_MP_Additional(NEMD_MP):
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
         lmp.make_dat(self.mol, file_name=self.dat_file, confId=confId)
 
+        cmap_fix = ''
+        cmap_unfix = ''
+        cmap_read_data = ''
+        if self.mol is not None and hasattr(self.mol, 'cmaps'):
+            cmap_fix       = 'fix cmap0 all cmap cmap.data'
+            cmap_unfix     = 'unfix cmap0'
+            cmap_read_data = 'fix cmap0 crossterm CMAP'
+        
+        all_nowater = 'all'
+        tip_lines = ''
+        tip_types = lmp.get_tip_types(self.mol)
+        if len(tip_types) > 0:
+            tip_types = [str(i) for i in tip_types]
+            tip_lines  = 'group water0 type ' + " ".join(tip_types) + "\n"
+            tip_lines += 'group nowater0 subtract all water0\n'
+            tip_lines += 'fix rigid1 water0 rigid/small molecule\n'
+            tip_lines += 'neigh_modify exclude molecule/intra water0\n'
+            all_nowater = 'nowater0'
+            
         # Make input file
         in_strings  = 'variable        axis    string %s\n' % (self.axis)
         in_strings += 'variable        slab    equal  %i\n' % (kwargs.get('slab', 20))
@@ -820,6 +870,10 @@ class NEMD_MP_Additional(NEMD_MP):
         in_strings += 'variable        pairst  string %s\n' % (self.pair_style)
         in_strings += 'variable        cutoff1 string %s\n' % (self.cutoff_in)
         in_strings += 'variable        cutoff2 string %s\n' % (self.cutoff_out)
+        in_strings += 'variable        bondst  string %s\n' % (self.bond_style)
+        in_strings += 'variable        anglest string %s\n' % (self.angle_style)
+        in_strings += 'variable        dihedst string %s\n' % (self.dihedral_style)
+        in_strings += 'variable        improst string %s\n' % (self.improper_style)
         in_strings += '##########################################################\n'
 
         in_strings += """
@@ -829,10 +883,10 @@ units           real
 atom_style      full
 boundary        p p p
 
-bond_style      harmonic  
-angle_style     harmonic
-dihedral_style  fourier
-improper_style  cvff
+bond_style      ${bondst}  
+angle_style     ${anglest}
+dihedral_style  ${dihedst}
+improper_style  ${improst}
 
 pair_style      ${pairst} ${cutoff1} ${cutoff2}
 pair_modify     mix arithmetic
@@ -841,7 +895,8 @@ neighbor        2.0 bin
 neigh_modify    delay 0 every 1 check yes
 kspace_style    pppm 1e-6
 
-read_data       ${dataf}
+%s
+read_data       ${dataf} %s
 
 thermo_modify   flush yes
 thermo          1000
@@ -855,6 +910,8 @@ variable        NA     equal 6.02214076*1.0e23
 variable        kcal2j equal 4.184*1000
 variable        ang2m  equal 1.0e-10
 variable        fs2s   equal 1.0e-15
+
+%s
 
 if "${axis} == x" then &
   "variable     ahi   equal  xhi" &
@@ -871,6 +928,10 @@ elif "${axis} == z" &
   "variable     alo   equal  zlo" &
   "variable     Jarea equal  lx*ly" &
   "variable     idx   equal  3"
+
+%s
+
+%s
 
 variable        Nfreq   equal  ${exchg}/${Nevery}       # Number of data points to compute temperature during exchange interval 
 variable        invslab equal  1/${slab}
@@ -897,7 +958,7 @@ elif "${axis} == z" &
 ## NEMD with kinetic energy exchange (RNEMD)
 ##########################################################
 timestep        ${TimeSt}
-fix             NVE all nve
+fix             NVE %s nve
 fix             mp  all thermal/conductivity ${exchg} ${axis} ${slab}
 
 # Generate temperature profile of layers
@@ -918,7 +979,7 @@ thermo          ${exchg}
 run             ${NStep}
 
 
-"""
+""" % (cmap_fix, cmap_read_data, cmap_unfix, cmap_fix, tip_lines, all_nowater)
 
         if decomp:
             in_strings += """
@@ -1180,6 +1241,25 @@ class NEMD_Langevin(preset.Preset):
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
         lmp.make_dat(self.mol, file_name=self.dat_file, confId=confId)
 
+        cmap_fix = ''
+        cmap_unfix = ''
+        cmap_read_data = ''
+        if self.mol is not None and hasattr(self.mol, 'cmaps'):
+            cmap_fix       = 'fix cmap0 all cmap cmap.data'
+            cmap_unfix     = 'unfix cmap0'
+            cmap_read_data = 'fix cmap0 crossterm CMAP'
+        
+        all_nowater = 'all'
+        tip_lines = ''
+        tip_types = lmp.get_tip_types(self.mol)
+        if len(tip_types) > 0:
+            tip_types = [str(i) for i in tip_types]
+            tip_lines  = 'group water0 type ' + " ".join(tip_types) + "\n"
+            tip_lines += 'group nowater0 subtract all water0\n'
+            tip_lines += 'fix rigid1 water0 rigid/small molecule\n'
+            tip_lines += 'neigh_modify exclude molecule/intra water0\n'
+            all_nowater = 'nowater0'
+            
         # Make input file
         in_strings  = 'variable        axis    string %s\n' % (self.axis)
         in_strings += 'variable        rep     equal  %i\n' % (rep)
@@ -1211,6 +1291,10 @@ class NEMD_Langevin(preset.Preset):
         in_strings += 'variable        pairst  string %s\n' % (self.pair_style)
         in_strings += 'variable        cutoff1 string %s\n' % (self.cutoff_in)
         in_strings += 'variable        cutoff2 string %s\n' % (self.cutoff_out)
+        in_strings += 'variable        bondst  string %s\n' % (self.bond_style)
+        in_strings += 'variable        anglest string %s\n' % (self.angle_style)
+        in_strings += 'variable        dihedst string %s\n' % (self.dihedral_style)
+        in_strings += 'variable        improst string %s\n' % (self.improper_style)
         in_strings += '##########################################################\n'
         in_strings += """
 
@@ -1220,10 +1304,10 @@ units           real
 atom_style      full
 boundary        p p p
 
-bond_style      harmonic  
-angle_style     harmonic
-dihedral_style  fourier
-improper_style  cvff
+bond_style      ${bondst}  
+angle_style     ${anglest}
+dihedral_style  ${dihedst}
+improper_style  ${improst}
 
 pair_style      ${pairst} ${cutoff1} ${cutoff2}
 pair_modify     mix arithmetic
@@ -1232,7 +1316,8 @@ neighbor        2.0 bin
 neigh_modify    delay 0 every 1 check yes
 kspace_style    pppm 1e-6
 
-read_data       ${dataf}
+%s
+read_data       ${dataf} %s
 
 thermo_modify   flush yes
 thermo          1000
@@ -1246,6 +1331,8 @@ variable        NA     equal 6.02214076*1.0e23
 variable        kcal2j equal 4.184*1000
 variable        ang2m  equal 1.0e-10
 variable        fs2s   equal 1.0e-15
+
+%s
 
 if "${axis} == x" then &
   "replicate    ${rep} ${repo} ${repo}" &
@@ -1265,6 +1352,10 @@ elif "${axis} == z" &
   "variable     alo   equal  zlo" &
   "variable     Jarea equal  lx*ly" &
   "variable     idx   equal  3"
+
+%s
+
+%s
 
 variable        Nfreq   equal  ${avetime}/${Nevery}       # Number of data points to compute temperature during exchange interval 
 variable        invslab equal  1/${slab}
@@ -1290,9 +1381,9 @@ elif "${axis} == z" &
   "region       rfree   block    INF  INF  INF  INF  ${inlo}  ${outhi}  units box" &
   "region       rflux   block    INF  INF  INF  INF  ${inhi}  ${outlo}  units box"
 
-group           gin     dynamic all region rqin
-group           gout    dynamic all region rqout
-group           gfree               region rfree
+group           gin     dynamic   %s region rqin
+group           gout    dynamic   %s region rqout
+group           gfree   intersect %s region rfree
 
 reset_timestep  0
 ##########################################################
@@ -1333,7 +1424,8 @@ fix             E_out all print ${avetime} "${Time} ${EL} ${ER}" file ${Jprof} s
 run             ${NStep}
 
 
-"""
+""" % (cmap_fix, cmap_read_data, cmap_unfix, cmap_fix, tip_lines,
+       all_nowater, all_nowater, all_nowater)
         if decomp:
             in_strings += """
 ##########################################################
@@ -1760,6 +1852,25 @@ class EMD_GK(preset.Preset):
         lmp.make_dat(self.mol, file_name=self.dat_file, confId=confId)
         seed = np.random.randint(1000, 999999)
 
+        cmap_fix = ''
+        cmap_unfix = ''
+        cmap_read_data = ''
+        if self.mol is not None and hasattr(self.mol, 'cmaps'):
+            cmap_fix       = 'fix cmap0 all cmap cmap.data'
+            cmap_unfix     = 'unfix cmap0'
+            cmap_read_data = 'fix cmap0 crossterm CMAP'
+        
+        all_nowater = 'all'
+        tip_lines = ''
+        tip_types = lmp.get_tip_types(self.mol)
+        if len(tip_types) > 0:
+            tip_types = [str(i) for i in tip_types]
+            tip_lines  = 'group water0 type ' + " ".join(tip_types) + "\n"
+            tip_lines += 'group nowater0 subtract all water0\n'
+            tip_lines += 'fix rigid1 water0 rigid/small molecule\n'
+            tip_lines += 'neigh_modify exclude molecule/intra water0\n'
+            all_nowater = 'nowater0'
+            
         # Make input file
         in_strings  = 'variable        TimeSt    equal  %f\n' % (time_step)
         in_strings += 'variable        NStep     equal  %i\n' % (step)
@@ -1784,6 +1895,10 @@ class EMD_GK(preset.Preset):
         in_strings += 'variable        pairst    string %s\n' % (self.pair_style)
         in_strings += 'variable        cutoff1   string %s\n' % (self.cutoff_in)
         in_strings += 'variable        cutoff2   string %s\n' % (self.cutoff_out)
+        in_strings += 'variable        bondst    string %s\n' % (self.bond_style)
+        in_strings += 'variable        anglest   string %s\n' % (self.angle_style)
+        in_strings += 'variable        dihedst   string %s\n' % (self.dihedral_style)
+        in_strings += 'variable        improst   string %s\n' % (self.improper_style)
         in_strings += """
 
 variable        NA     equal 6.02214076*1.0e23
@@ -1800,10 +1915,10 @@ units           real
 atom_style      full
 boundary        p p p
 
-bond_style      harmonic  
-angle_style     harmonic
-dihedral_style  fourier
-improper_style  cvff
+bond_style      ${bondst}  
+angle_style     ${anglest}
+dihedral_style  ${dihedst}
+improper_style  ${improst}
 
 pair_style      ${pairst} ${cutoff1} ${cutoff2}
 pair_modify     mix arithmetic
@@ -1812,7 +1927,10 @@ neighbor        2.0 bin
 neigh_modify    delay 0 every 1 check yes
 kspace_style    pppm 1e-6
 
-read_data       ${dataf}
+%s
+read_data       ${dataf} %s
+
+%s
 
 velocity        all create ${Ttemp} ${seed} mom yes rot yes dist gaussian
 
@@ -1841,7 +1959,7 @@ variable        kappazz   equal trap(f_JJ[5])*${kpscale}
 variable        kappa     equal (v_kappaxx+v_kappayy+v_kappazz)/3.0   # in isotropic system, getting the average
 fix             kappa     all ave/time ${kpdump} 1 ${kpdump} v_kappaxx v_kappayy v_kappazz v_kappa ave one file ${kappaf}
 
-fix             NVT1 all nvt temp ${Ttemp} ${Ttemp} 100
+fix             NVT1 %s nvt temp ${Ttemp} ${Ttemp} 100
 
 # Output
 dump            1 all custom 1000 ${dumpf} id type mol x y z vx vy vz
@@ -1857,7 +1975,7 @@ run             ${NStep}
 write_dump      all custom ${ldumpf} id x y z xu yu zu vx vy vz fx fy fz modify sort id
 write_data      ${ldataf}
 quit
-"""
+""" % (cmap_fix, cmap_read_data, tip_lines, all_nowater)
 
         with open(os.path.join(self.work_dir, self.in_file), 'w') as fh:
             fh.write(in_strings)

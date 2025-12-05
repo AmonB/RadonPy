@@ -54,6 +54,13 @@ setup(
         'lammps':[
             'lammps>=2020.03.03'
         ],
+        'biopolymers':[
+            'ambertools',
+            'intermol',
+        ],
+        'minepy':[
+            'minepy'
+        ],
     },
 
     platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
@@ -80,6 +87,8 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
         'Topic :: Scientific/Engineering :: Chemistry',
         'Topic :: Scientific/Engineering :: Physics',
         'Topic :: Software Development :: Libraries :: Python Modules',
