@@ -111,6 +111,9 @@ class LAMMPS():
         else:
             opt_flag = False
 
+        if mpi != 0:
+            mpi = check_mpirun(mpi)
+
         if mpi > 0:
             mpi_cmd = const.mpi_cmd % (mpi)
         elif mpi == 0:
@@ -218,11 +221,9 @@ class LAMMPS():
         check_opt = False
         check_gpu = False
 
+        _ = check_mpirun(1)
         try:
-            mpi_cmd = const.mpi_cmd % 1
-            mpi_cmd = mpi_cmd.split()[0]
-
-            cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+            cmd = '%s -h' % (self.solver_path)
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
 
@@ -245,32 +246,8 @@ class LAMMPS():
                         check_gpu = True
 
         except:
-            try:
-                cmd = '%s -h' % self.solver_path
-                cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
-                lines = str(cp.stdout).splitlines()
-
-                flag = False
-                for l in lines:
-                    if 'Installed packages:' in l:
-                        flag = True
-                    elif flag:
-                        if 'OPENMP' in l or 'USER-OMP' in l:
-                            utils.radon_print('OPENMP package is available.', level=1)
-                            check_omp = True
-                        if 'INTEL' in l:
-                            utils.radon_print('INTEL package is available.', level=1)
-                            check_intel = True
-                        if 'OPT' in l:
-                            utils.radon_print('OPT package is available.', level=1)
-                            check_opt = True
-                        if 'GPU' in l:
-                            utils.radon_print('GPU package is available.', level=1)
-                            check_gpu = True
-
-            except:
-                utils.radon_print('Could not obtain package information of LAMMPS.', level=2)
-                return False
+            utils.radon_print('Could not obtain package information of LAMMPS.', level=2)
+            return False
 
         self.package['omp'] = check_omp
         self.package['intel'] = check_intel
@@ -283,26 +260,17 @@ class LAMMPS():
     def get_version(self):
 
         ver = None
+        _ = check_mpirun(1)
         try:
-            mpi_cmd = const.mpi_cmd % 1
-            cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+            cmd = '%s -h' % (self.solver_path)
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
-
+    
             for l in lines:
                 if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
                     ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
         except:
-            try:
-                cmd = '%s -h' % self.solver_path
-                cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
-                lines = str(cp.stdout).splitlines()
-
-                for l in lines:
-                    if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
-                        ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
-            except:
-                return ver
+            return ver
 
         return ver
         
@@ -1091,7 +1059,29 @@ class LAMMPS():
 
         return uwstr, wstr, np.array(cell), v, f
 
+def check_mpirun(mpi):
+    """Check if mpirun is available
+ 
+     Args:
+         mpi: Number of cpus to use
+ 
+     Return:
+         mpi: Number of cpus to use
+    """
+    try:
+        mpi_exec = const.mpi_cmd.split()[0] if const.mpi_cmd else 'mpirun'
+        cp_check = subprocess.run([mpi_exec, '--version'], 
+                     stdout=subprocess.PIPE, 
+                     stderr=subprocess.PIPE, 
+                     timeout=5)
+        if cp_check.returncode != 0:
+            mpi = 0
+            utils.radon_print('mpirun is not available. Parallel number of MPI is changed to zero.', level=2)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        mpi = 0
+        utils.radon_print('mpirun is not available. Parallel number of MPI is changed to zero.', level=2)
 
+    return mpi
 
 
 ###########################################

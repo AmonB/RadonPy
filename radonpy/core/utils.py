@@ -16,6 +16,7 @@ import pickle
 import json
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
 from . import const
 from ..ff import ff_class
 
@@ -1102,7 +1103,6 @@ def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereoche
         etkdg = AllChem.ETKDG()
     etkdg.enforceChirality=True
     etkdg.useRandomCoords = False
-    etkdg.maxAttempts = 100
 
     try:
         mol = Chem.MolFromSmiles(smi)

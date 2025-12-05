@@ -11,7 +11,8 @@ import os
 import json
 from itertools import permutations
 from rdkit import Chem
-from ..core import calc, utils
+from ..core import utils
+from ..core import calc
 
 __version__ = '0.3.0b3'
 

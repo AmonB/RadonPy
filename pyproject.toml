@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radonpy-pypi"
+dynamic = ["version"]
+description = "RadonPy is a Python library to automate physical property calculations for polymer informatics."
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+authors = [
+    {name = "Yoshihiro Hayashi", email = "yhayashi@ism.ac.jp"}
+]
+keywords = ["polymer informatics", "molecular dynamics"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+#dependencies = []
+
+[project.optional-dependencies]
+lammps = [
+    "lammps>=2020.03.03",
+]
+
+[project.urls]
+Homepage = "https://github.com/RadonPy/RadonPy"
+Repository = "https://github.com/RadonPy/RadonPy"
+
+[tool.setuptools]
+platforms = ["Linux", "Mac OS-X", "Unix", "Windows"]
+
+[tool.setuptools.packages.find]
+include = ["radonpy*"]
+
+[tool.setuptools.package-data]
+radonpy = ["ff/ff_dat/*.json"]
+
+[tool.setuptools.dynamic]
+version = {attr = "radonpy.__version__"}
