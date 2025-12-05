@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. RadonPy developers. All rights reserved.
+#  Copyright (c) 2023. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -13,12 +13,12 @@ import gc
 from rdkit import Chem
 from rdkit import Geometry as Geom
 from ..core import utils, const, calc
-from .qm_wrapper import QMw
+from .psi4_wrapper import Psi4w
 
-__version__ = '0.2.9'
+__version__ = '0.3.0b2'
 
 
-def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='charge', qm_solver='psi4',
+def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='charge',
     opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
     charge_method='HF', charge_basis='6-31G(d)', charge_basis_gen={'Br':'6-31G(d)', 'I': 'lanl2dz'},
     total_charge=None, total_multiplicity=None, **kwargs):
@@ -48,7 +48,7 @@ def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_di
     Returns:
         boolean
     """
-    flag = calc.assign_charges(mol, charge=charge, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name=log_name, qm_solver=qm_solver,
+    flag = calc.assign_charges(mol, charge=charge, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name=log_name,
             opt_method=opt_method, opt_basis=opt_basis, geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm,
             charge_method=charge_method, charge_basis=charge_basis, charge_basis_gen=charge_basis_gen,
             total_charge=total_charge, total_multiplicity=total_multiplicity, **kwargs)
@@ -56,7 +56,7 @@ def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_di
     return flag
         
 
-def conformation_search(mol, ff=None, nconf=1000, dft_nconf=4, etkdg_ver=2, rmsthresh=0.5, tfdthresh=0.02, clustering='TFD', qm_solver='psi4',
+def conformation_search(mol, ff=None, nconf=1000, dft_nconf=4, etkdg_ver=2, rmsthresh=0.5, tfdthresh=0.02, clustering='TFD',
     opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'},
     geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO', log_name='mol', solver='lammps', solver_path=None, work_dir=None, tmp_dir=None,
     etkdg_omp=-1, psi4_omp=-1, psi4_mp=0, omp=1, mpi=-1, gpu=0, mm_mp=0, memory=1000, total_charge=None, total_multiplicity=None, **kwargs):
@@ -91,7 +91,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=4, etkdg_ver=2, rmst
         RDKit Mol object
         DFT and MM energy (ndarray, kcal/mol)
     """
-    mol, energy = calc.conformation_search(mol, ff=ff, nconf=nconf, dft_nconf=dft_nconf, etkdg_ver=etkdg_ver, rmsthresh=rmsthresh, qm_solver=qm_solver,
+    mol, energy = calc.conformation_search(mol, ff=ff, nconf=nconf, dft_nconf=dft_nconf, etkdg_ver=etkdg_ver, rmsthresh=rmsthresh,
                 tfdthresh=tfdthresh, clustering=clustering, opt_method=opt_method, opt_basis=opt_basis,
                 opt_basis_gen=opt_basis_gen, geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm, log_name=log_name,
                 solver=solver, solver_path=solver_path, work_dir=work_dir, tmp_dir=tmp_dir,
@@ -101,7 +101,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=4, etkdg_ver=2, rmst
     return mol, energy
 
 
-def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_prop', qm_solver='psi4',
+def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_prop',
     opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'}, 
     geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
     sp_method='wb97m-d3bj', sp_basis='6-311G(d,p)', sp_basis_gen={'Br': '6-311G(d,p)', 'I': 'lanl2dz'},
@@ -109,7 +109,7 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
     """
     sim.qm.sp_prop
 
-    Calculation of total energy, HOMO, LUMO, dipole moment by QM calculation
+    Calculation of total energy, HOMO, LUMO, dipole moment by Psi4
 
     Args:
         mol: RDKit Mol object
@@ -141,7 +141,7 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
     if type(total_multiplicity) is int:
         kwargs['multiplicity'] = total_multiplicity
 
-    psi4mol = QMw(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen, qm_solver=qm_solver,
+    psi4mol = Psi4w(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen, 
                     name=log_name, **kwargs)
     if opt:
         psi4mol.optimize(geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm)
@@ -168,7 +168,7 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
     return e_prop
 
 
-def polarizability(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='polarizability', qm_solver='psi4', mp=0,
+def polarizability(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='polarizability', mp=0,
     opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'}, 
     geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
     polar_method='wb97m-d3bj', polar_basis='6-311+G(2d,p)', polar_basis_gen={'Br': '6-311G(d,p)', 'I': 'lanl2dz'},
@@ -176,7 +176,7 @@ def polarizability(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_nam
     """
     sim.qm.polarizability
 
-    Calculation of dipole polarizability by QM calculation
+    Calculation of dipole polarizability by Psi4
 
     Args:
         mol: RDKit Mol object
@@ -206,7 +206,7 @@ def polarizability(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_nam
     if type(total_multiplicity) is int:
         kwargs['multiplicity'] = total_multiplicity
 
-    psi4mol = QMw(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen, qm_solver=qm_solver,
+    psi4mol = Psi4w(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
                     name=log_name, **kwargs)
     if opt:
         psi4mol.optimize(geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm)
@@ -242,7 +242,7 @@ def polarizability(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_nam
     return polar_data
 
 
-def refractive_index(mols, density, ratio=None, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='refractive_index', qm_solver='psi4', mp=0,
+def refractive_index(mols, density, ratio=None, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='refractive_index', mp=1,
         opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'}, 
         geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
         polar_method='wb97m-d3bj', polar_basis='6-311+G(2d,p)', polar_basis_gen={'Br': '6-311G(d,p)', 'I': 'lanl2dz'},
@@ -250,7 +250,7 @@ def refractive_index(mols, density, ratio=None, confId=0, opt=True, work_dir=Non
     """
     sim.qm.refractive_index
 
-    Calculation of refractive index by QM calculation
+    Calculation of refractive index by Psi4
 
     Args:
         mols: List of RDKit Mol object
@@ -283,7 +283,7 @@ def refractive_index(mols, density, ratio=None, confId=0, opt=True, work_dir=Non
     a_list = []
     
     for i, mol in enumerate(mols):
-        polar_data = polarizability(mol, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name='%s_%i' % (log_name, i), qm_solver=qm_solver, mp=mp,
+        polar_data = polarizability(mol, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name='%s_%i' % (log_name, i), mp=mp,
                             opt_method=opt_method, opt_basis=opt_basis, opt_basis_gen=opt_basis_gen, 
                             geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm,
                             polar_method=polar_method, polar_basis=polar_basis, polar_basis_gen=polar_basis_gen,
@@ -297,7 +297,6 @@ def refractive_index(mols, density, ratio=None, confId=0, opt=True, work_dir=Non
     return ri_data
 
 
-# Experimental
 def abbe_number_cc2(mol, density, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='abbe_number_cc2',
         opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'}, 
         geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
@@ -343,7 +342,7 @@ def abbe_number_cc2(mol, density, confId=0, opt=True, work_dir=None, tmp_dir=Non
 
     mol_weight = calc.molecular_weight(mol)
 
-    psi4mol = QMw(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
+    psi4mol = Psi4w(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
                     name=log_name, **kwargs)
     if opt:
         psi4mol.optimize(geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm)
@@ -380,7 +379,6 @@ def abbe_number_cc2(mol, density, confId=0, opt=True, work_dir=None, tmp_dir=Non
     return abbe_data
 
 
-# Experimental
 def polar_sos(res, wavelength=None):
     """
     sim.qm.polar_sos
@@ -464,7 +462,7 @@ def polarizability_sos(mol, wavelength=None, confId=0, opt=True, work_dir=None, 
     if type(total_multiplicity) is int:
         kwargs['multiplicity'] = total_multiplicity
 
-    psi4mol = QMw(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
+    psi4mol = Psi4w(mol, confId=confId, work_dir=work_dir, tmp_dir=tmp_dir, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
                     name=log_name, **kwargs)
     if opt:
         psi4mol.optimize(geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm)
@@ -605,7 +603,7 @@ def refractive_index_sos(mols, density, ratio=None, wavelength=None, confId=0, o
     a_list = np.array(a_list)
 
     ri_data = {}
-    for i, l in enumerate(wavelength):
+    for i, l in enumerate(wavelength): 
         if i is None:
             ri_data['refractive_index_sos'] = calc.refractive_index(a_list[:, i], density, mol_weight, ratio=ratio)
         else:

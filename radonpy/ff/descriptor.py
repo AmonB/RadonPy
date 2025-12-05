@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. RadonPy developers. All rights reserved.
+#  Copyright (c) 2023. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -7,24 +7,33 @@
 # ******************************************************************************
 
 import numpy as np
+import pandas as pd
 from scipy.stats import skew, kurtosis
+from matplotlib import pyplot as plt
 import multiprocessing as MP
 import concurrent.futures as confu
 from rdkit import Chem
 from ..core import poly, utils, const
 
+mic_avail = True
+try:
+    from minepy import MINE
+except ImportError:
+    mic_avail = False
 
-__version__ = '0.2.3'
+
+__version__ = '0.3.0b3'
 
 
 class FF_descriptor():
-    def __init__(self, ff, charge_max=1.0, charge_min=-1.0, polar=False, polar_max=2.0, deuterium=False,
-                stats=['mean', 'std', 'skew', 'kurtosis', 'max', 'min'], **kwargs):
+    def __init__(self, ff, charge_max=1.0, charge_min=-1.0, polar=True, polar_max=2.0, deuterium=False,
+                stats=['mean', 'std', 'max', 'min'], df=True, **kwargs):
         ignore_pt = ['hw', 'n4', 'nx', 'ny', 'nz', 'n+']
         self.ff = ff
         self.polar = polar
         self.deuterium = deuterium
         self.stats = stats
+        self.df = df
 
         # Get FF parameter list
         self.ff_mass = [1.008, 12.011, 14.007, 15.999, 18.998, 30.974, 32.067, 35.453, 79.904, 126.904] # H,C,N,O,F,P,S,Cl,Br,I
@@ -76,33 +85,45 @@ class FF_descriptor():
         self.mu = kwargs.get('mu', None)
         self.mu_mass = kwargs.get('mu_mass', None)
         
+
+    def _setup(self):
         # Setting sigma
         if self.s is None:
             if self.polar:
-                self.s = np.array([1/self.nk/2]*9)
+                s = np.array([1/self.nk/np.sqrt(2)]*9)
             else:
-                self.s = np.array([1/self.nk/2]*8)
-        elif type(self.s) is float:
+                s = np.array([1/self.nk/np.sqrt(2)]*8)
+        elif isinstance(self.s, float):
             if self.polar:
-                self.s = np.array([self.s]*9)
+                s = np.array([self.s]*9)
             else:
-                self.s = np.array([self.s]*8)
+                s = np.array([self.s]*8)
+        else:
+            s = self.s
 
-        # Setting mu_mass
-        if self.mu_mass is None:
-            if self.deuterium:
-                self.mu_mass = self.mass_scale.scale(self.ff_mass_D)
-            else:
-                self.mu_mass = self.mass_scale.scale(self.ff_mass)
+        # Setting sigma_mass
+        s_mass = self.s_mass
 
         # Setting mu
         if self.mu is None:
             if self.polar:
-                self.mu = np.zeros((9, self.nk))
+                mu = np.zeros((9, self.nk))
             else:
-                self.mu = np.zeros((8, self.nk))
-            self.mu[:][:] = np.linspace(0.0, 1.0, self.nk*2+1)[1:-1:2]
+                mu = np.zeros((8, self.nk))
+            mu[:][:] = np.linspace(0.0, 1.0, self.nk*2+1)[1:-1:2]
+        else:
+            mu = self.mu
 
+        # Setting mu_mass
+        if self.mu_mass is None:
+            if self.deuterium:
+                mu_mass = self.mass_scale.scale(self.ff_mass_D)
+            else:
+                mu_mass = self.mass_scale.scale(self.ff_mass)
+        else:
+            mu_mass = self.mu_mass
+
+        return s, s_mass, mu, mu_mass
 
 
     def get_param_list(self, mol, ignoreH=False):
@@ -131,7 +152,7 @@ class FF_descriptor():
 
         k_ang = []
         theta0 = []
-        for ang in mol.angles:
+        for ang in mol.angles.values():
             if ignoreH and (mol.GetAtomWithIdx(ang.a).GetSymbol() == 'H' or
                 mol.GetAtomWithIdx(ang.b).GetSymbol() == 'H' or mol.GetAtomWithIdx(ang.c).GetSymbol() == 'H'):
                 continue
@@ -140,7 +161,7 @@ class FF_descriptor():
 
         k_dih = []
         #phi0 = []
-        for dih in mol.dihedrals:
+        for dih in mol.dihedrals.values():
             if ignoreH and (mol.GetAtomWithIdx(dih.a).GetSymbol() == 'H' or mol.GetAtomWithIdx(dih.b).GetSymbol() == 'H' or
                 mol.GetAtomWithIdx(dih.c).GetSymbol() == 'H' or mol.GetAtomWithIdx(dih.d).GetSymbol() == 'H'):
                 continue
@@ -289,7 +310,14 @@ class FF_descriptor():
         with confu.ProcessPoolExecutor(max_workers=mp, mp_context=MP.get_context('spawn')) as executor:
             results = executor.map(ffss_mp_wrapper, args)
 
-        return results
+        if self.df:
+            if isinstance(smiles, pd.Series):
+                desc_df = pd.DataFrame(results, columns=self.ffss_desc_names(), index=smiles.index)
+            else:
+                desc_df = pd.DataFrame(results, columns=self.ffss_desc_names())
+            return desc_df
+        else:
+            return results
 
 
     def ffss_desc_names(self):
@@ -307,41 +335,26 @@ class FF_descriptor():
 
 
     def ff_kernel_mean(self, mols, ratio=None, nk=None, kernel=None, s=None, s_mass=None, mu=None, mu_mass=None, ignoreH=False):
-
+        setup_flag = False
         if kernel is None:
             kernel = self.Gaussian
 
-        if nk is None:
-            nk = self.nk
+        if type(nk) is int:
+            self.nk = nk
 
-        # Setting sigma
-        if s is None:
-            pass
-        elif type(s) is float:
-            if self.polar:
-                self.s = np.array([s]*9)
-            else:
-                self.s = np.array([s]*8)
-        elif type(s) is list:
-            self.s = np.array(s)
-        s = self.s
+        if isinstance(s, float) or isinstance(s, list):
+            self.s = s
 
-        # Setting sigma of mass
-        s_mass = self.s_mass
+        if isinstance(s_mass, float) or isinstance(s_mass, list):
+            self.s_mass = s_mass
 
-        # Setting mu
-        if mu is None:
-            pass
-        else:
+        if mu is not None:
             self.mu = mu
-        center = self.mu
 
-        # Setting mu of mass
-        if mu_mass is None:
-            pass
-        else:
+        if mu_mass is not None:
             self.mu_mass = mu_mass
-        center_mass = self.mu_mass
+
+        s, s_mass, mu, mu_mass = self._setup()
 
         if type(mols) is Chem.Mol:
             mols = [mols]
@@ -400,27 +413,27 @@ class FF_descriptor():
 
         # Calculate kernel mean
         if self.polar:
-            mass_km    = self.kernel_mean(mass,    kernel, center_mass, weights=w_atom,  sigma=s_mass)
-            charge_km  = self.kernel_mean(charge,  kernel, center[0],   weights=w_atom,  sigma=s[0])
-            epsilon_km = self.kernel_mean(epsilon, kernel, center[1],   weights=w_atom,  sigma=s[1])
-            sigma_km   = self.kernel_mean(sigma,   kernel, center[2],   weights=w_atom,  sigma=s[2])
-            k_bond_km  = self.kernel_mean(k_bond,  kernel, center[3],   weights=w_bond,  sigma=s[3])
-            r0_km      = self.kernel_mean(r0,      kernel, center[4],   weights=w_bond,  sigma=s[4])
-            polar_km   = self.kernel_mean(polar,   kernel, center[5],   weights=w_bond,  sigma=s[5])
-            k_ang_km   = self.kernel_mean(k_ang,   kernel, center[6],   weights=w_angle, sigma=s[6])
-            theta0_km  = self.kernel_mean(theta0,  kernel, center[7],   weights=w_angle, sigma=s[7])
-            k_dih_km   = self.kernel_mean(k_dih,   kernel, center[8],   weights=w_dih,   sigma=s[8])
+            mass_km    = self.kernel_mean(mass,    kernel, mu_mass, weights=w_atom,  sigma=s_mass)
+            charge_km  = self.kernel_mean(charge,  kernel, mu[0],   weights=w_atom,  sigma=s[0])
+            epsilon_km = self.kernel_mean(epsilon, kernel, mu[1],   weights=w_atom,  sigma=s[1])
+            sigma_km   = self.kernel_mean(sigma,   kernel, mu[2],   weights=w_atom,  sigma=s[2])
+            k_bond_km  = self.kernel_mean(k_bond,  kernel, mu[3],   weights=w_bond,  sigma=s[3])
+            r0_km      = self.kernel_mean(r0,      kernel, mu[4],   weights=w_bond,  sigma=s[4])
+            polar_km   = self.kernel_mean(polar,   kernel, mu[5],   weights=w_bond,  sigma=s[5])
+            k_ang_km   = self.kernel_mean(k_ang,   kernel, mu[6],   weights=w_angle, sigma=s[6])
+            theta0_km  = self.kernel_mean(theta0,  kernel, mu[7],   weights=w_angle, sigma=s[7])
+            k_dih_km   = self.kernel_mean(k_dih,   kernel, mu[8],   weights=w_dih,   sigma=s[8])
             desc = np.hstack([mass_km, charge_km, epsilon_km, sigma_km, k_bond_km, r0_km, polar_km, k_ang_km, theta0_km, k_dih_km])
         else:
-            mass_km    = self.kernel_mean(mass,    kernel, center_mass, weights=w_atom,  sigma=s_mass)
-            charge_km  = self.kernel_mean(charge,  kernel, center[0],   weights=w_atom,  sigma=s[0])
-            epsilon_km = self.kernel_mean(epsilon, kernel, center[1],   weights=w_atom,  sigma=s[1])
-            sigma_km   = self.kernel_mean(sigma,   kernel, center[2],   weights=w_atom,  sigma=s[2])
-            k_bond_km  = self.kernel_mean(k_bond,  kernel, center[3],   weights=w_bond,  sigma=s[3])
-            r0_km      = self.kernel_mean(r0,      kernel, center[4],   weights=w_bond,  sigma=s[4])
-            k_ang_km   = self.kernel_mean(k_ang,   kernel, center[5],   weights=w_angle, sigma=s[5])
-            theta0_km  = self.kernel_mean(theta0,  kernel, center[6],   weights=w_angle, sigma=s[6])
-            k_dih_km   = self.kernel_mean(k_dih,   kernel, center[7],   weights=w_dih,   sigma=s[7])
+            mass_km    = self.kernel_mean(mass,    kernel, mu_mass, weights=w_atom,  sigma=s_mass)
+            charge_km  = self.kernel_mean(charge,  kernel, mu[0],   weights=w_atom,  sigma=s[0])
+            epsilon_km = self.kernel_mean(epsilon, kernel, mu[1],   weights=w_atom,  sigma=s[1])
+            sigma_km   = self.kernel_mean(sigma,   kernel, mu[2],   weights=w_atom,  sigma=s[2])
+            k_bond_km  = self.kernel_mean(k_bond,  kernel, mu[3],   weights=w_bond,  sigma=s[3])
+            r0_km      = self.kernel_mean(r0,      kernel, mu[4],   weights=w_bond,  sigma=s[4])
+            k_ang_km   = self.kernel_mean(k_ang,   kernel, mu[5],   weights=w_angle, sigma=s[5])
+            theta0_km  = self.kernel_mean(theta0,  kernel, mu[6],   weights=w_angle, sigma=s[6])
+            k_dih_km   = self.kernel_mean(k_dih,   kernel, mu[7],   weights=w_dih,   sigma=s[7])
             desc = np.hstack([mass_km, charge_km, epsilon_km, sigma_km, k_bond_km, r0_km, k_ang_km, theta0_km, k_dih_km])
 
         return desc
@@ -440,7 +453,14 @@ class FF_descriptor():
         with confu.ProcessPoolExecutor(max_workers=mp, mp_context=MP.get_context('spawn')) as executor:
             results = executor.map(ffkm_mp_wrapper, args)
 
-        return results
+        if self.df:
+            if isinstance(smiles, pd.Series):
+                desc_df = pd.DataFrame(results, columns=self.ffkm_desc_names(nk=nk), index=smiles.index)
+            else:
+                desc_df = pd.DataFrame(results, columns=self.ffkm_desc_names(nk=nk))
+            return desc_df
+        else:
+            return results
 
 
     def ffkm_desc_names(self, nk=None):
@@ -511,6 +531,199 @@ class FF_descriptor():
         return np.exp(-np.abs(x - xm)/sigma) / (2*sigma)
 
 
+    def reverse_resolution_ffkm(self, desc_name, sigma=1):
+        if self.polar:
+            desc_class = {'charge': 0, 'epsilon': 1, 'sigma': 2, 'k_bond': 3, 'r0': 4, 'polar': 5, 'k_angle': 6, 'theta0': 7, 'k_dih': 8}
+        else:
+            desc_class = {'charge': 0, 'epsilon': 1, 'sigma': 2, 'k_bond': 3, 'r0': 4, 'k_angle': 5, 'theta0': 6, 'k_dih': 7}
+
+        f = '_'.join(desc_name.split('_')[0:-1])
+        f_idx = desc_class[f]
+        n = int(desc_name.split('_')[-1])
+
+        atype = []
+        if f == 'charge':
+            l = self.charge_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.charge_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+
+        elif f == 'epsilon':
+            l = self.epsilon_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.epsilon_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.pt.items():
+                if l <= val.epsilon <= u:
+                    atype.append(key)
+
+        elif f == 'sigma':
+            l = self.sigma_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.sigma_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.pt.items():
+                if l <= val.sigma <= u:
+                    atype.append(key)
+
+        elif f == 'k_bond':
+            l = self.k_bond_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.k_bond_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.bt.items():
+                if l <= val.k <= u:
+                    atype.append(key)
+
+        elif f == 'r0':
+            l = self.r0_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.r0_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.bt.items():
+                if l <= val.r0 <= u:
+                    atype.append(key)
+
+        elif f == 'polar':
+            l = self.polar_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.polar_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+
+        elif f == 'k_angle':
+            l = self.k_ang_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.k_ang_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.at.items():
+                if l <= val.k <= u:
+                    atype.append(key)
+
+        elif f == 'theta0':
+            l = self.theta0_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.theta0_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.at.items():
+                if l <= val.theta0 <= u:
+                    atype.append(key)
+
+        elif f == 'k_dih':
+            l = self.k_dih_scale.unscale(self.mu[f_idx, n] - self.s[f_idx]*sigma)
+            u = self.k_dih_scale.unscale(self.mu[f_idx, n] + self.s[f_idx]*sigma)
+            for key, val in self.ff.param.dt.items():
+                if l <= np.max(val.k) <= u:
+                    atype.append(key)
+
+        return atype, (l, u)
+
+
+    def mic(self, desc, y, mp=None):
+        if not mic_avail:
+            utils.radon_print('Cannot import minepy. You can use mic_ffkm by "pip install minepy"', level=3)
+            return dict()
+
+        if mp is None:
+            mp = utils.cpu_count()
+
+        idx = None
+        if isinstance(desc, pd.DataFrame):
+            idx = desc.columns
+            val = desc.values
+        elif isinstance(desc, list) or isinstance(desc, np.ndarray):
+            val = np.array(desc)
+
+        args = [[np.array(d), np.array(y)] for d in val.T]
+        with confu.ProcessPoolExecutor(max_workers=mp, mp_context=MP.get_context('spawn')) as executor:
+            results = executor.map(mic_mp_wrapper, args)
+
+        mic_seri = pd.Series(results, index=idx)
+
+        return mic_seri
+
+
+    def mic_ffkm_visualize(self, mic_seri, file_name='MIC.png', plt_show=False):
+        num_i = 0
+        num_l = 0
+        fig, ax = plt.subplots(figsize=(16, 6))
+
+        if isinstance(mic_seri, pd.Series):
+            mic_val = mic_seri.values
+        elif isinstance(mic_seri, dict):
+            mic_val = mic_seri.values()
+        elif isinstance(mic_seri, list) or isinstance(mic_seri, np.array):
+            mic_val = np.array(mic_seri)
+
+        if self.deuterium:
+            num_l += 11
+            plt.bar(range(num_l), mic_val[num_i:num_l], align="center", width=0.5)
+        else:
+            num_l += 10
+            plt.bar(range(num_l), mic_val[num_i:num_l], align="center", width=0.5)
+
+        if self.polar:
+            n = 9
+            x_tics = [(num_l-1)/2, *[num_l+self.nk*x+((self.nk-1)/2) for x in range(n)]]
+            x_tics_label = ['mass', 'charge', r'$\epsilon$', r'$\sigma$', r'$K_{bond}$', r'$r_{0}$', 'polar',
+                           r'$K_{angle}$', r'$\theta_{0}$', r'$K_{dihedral}$']
+        else:
+            n = 8
+            x_tics = [(num_l-1)/2, *[num_l+self.nk*x+((self.nk-1)/2) for x in range(n)]]
+            x_tics_label = ['mass', 'charge', r'$\epsilon$', r'$\sigma$', r'$K_{bond}$', r'$r_{0}$',
+                           r'$K_{angle}$', r'$\theta_{0}$', r'$K_{dihedral}$']
+
+        for i in range(n):
+            num_i = num_l
+            num_l += self.nk
+            plt.bar(range(num_i, num_l), mic_val[num_i:num_l], align="center", width=0.5)
+
+        ax.set_ylabel('MIC', fontsize=14)
+        ax.tick_params(axis='y', labelsize=12)
+        ax.set_xticks(x_tics) 
+        ax.set_xticklabels(x_tics_label)
+        ax.tick_params(axis='x', labelsize=12)
+
+        if plt_show:
+            plt.show()
+
+        if file_name is not None:
+            if isinstance(file_name, list):
+                for f in file_name:
+                    fig.savefig(f, dpi=500, bbox_inches="tight")
+            else:
+                fig.savefig(file_name, dpi=500, bbox_inches="tight")
+
+        plt.close(fig)
+
+
+    def mic_ffss_visualize(self, mic_seri, file_name='MIC.png', plt_show=False):
+        num_i = 0
+        num_l = len(self.stats)
+        fig, ax = plt.subplots(figsize=(16, 6))
+
+        if isinstance(mic_seri, pd.Series):
+            mic_val = mic_seri.values
+        elif isinstance(mic_seri, dict):
+            mic_val = mic_seri.values()
+        elif isinstance(mic_seri, list) or isinstance(mic_seri, np.array):
+            mic_val = np.array(mic_seri)
+
+        if self.polar:
+            x_tics_label = ['mass', 'charge', r'$\epsilon$', r'$\sigma$', r'$K_{bond}$', r'$r_{0}$', 'polar',
+                           r'$K_{angle}$', r'$\theta_{0}$', r'$K_{dihedral}$']
+        else:
+            x_tics_label = ['mass', 'charge', r'$\epsilon$', r'$\sigma$', r'$K_{bond}$', r'$r_{0}$',
+                           r'$K_{angle}$', r'$\theta_{0}$', r'$K_{dihedral}$']
+        x_tics = [len(self.stats)*x+((len(self.stats)-1)/2) for x in range(len(x_tics_label))]
+
+        for i in range(len(x_tics_label)):
+            plt.bar(range(num_i, num_l), mic_val[num_i:num_l], align="center", width=0.5)
+            num_i = num_l
+            num_l += len(self.stats)
+
+        ax.set_ylabel('MIC', fontsize=14)
+        ax.tick_params(axis='y', labelsize=12)
+        ax.set_xticks(x_tics) 
+        ax.set_xticklabels(x_tics_label)
+        ax.tick_params(axis='x', labelsize=12)
+
+        if plt_show:
+            plt.show()
+
+        if file_name is not None:
+            if isinstance(file_name, list):
+                for f in file_name:
+                    fig.savefig(f, dpi=500, bbox_inches="tight")
+            else:
+                fig.savefig(file_name, dpi=500, bbox_inches="tight")
+
+        plt.close(fig)
+
+
 def ffss_mp_wrapper(args):
     flag = True
     mols = []
@@ -523,8 +736,8 @@ def ffss_mp_wrapper(args):
 
     try:
         for smiles in smi:
-            if cyclic:
-                mol = poly.make_cyclicpolymer(smiles, n=cyclic, return_mol=True)
+            if cyclic > 0 and smiles.count('*') == 2:
+                mol = poly.make_cyclicpolymer(smiles, n=cyclic, return_mol=True, removeHs=False)
             else:
                 mol = Chem.MolFromSmiles(smiles)
                 mol = Chem.AddHs(mol)
@@ -536,10 +749,14 @@ def ffss_mp_wrapper(args):
         if flag:
             desc = descobj.ff_summary_statistics(mols, ratio=ratio, ignoreH=ignoreH)
         else:
-            utils.radon_print('Fail to assign force field. %s' % (','.join(smi)), level=2)
+            utils.radon_print('Fail to assign force field. %s' % (str(','.join(smi))), level=2)
             desc = np.full(len(descobj.ffss_desc_names()), np.nan)
-    except:
-        utils.radon_print('Fail to calculate descriptor. %s' % (','.join(smi)), level=2)
+    except Exception as e:
+        is_str = np.array([isinstance(s, str) for s in smi])
+        if np.all(is_str):
+            utils.radon_print('Fail to calculate descriptor. %s %s' % (str(','.join(smi)), str(e)), level=2)
+        else:
+            utils.radon_print('Fail to calculate descriptor because input SMILES includes illegal data.')
         desc = np.full(len(descobj.ffss_desc_names()), np.nan)
 
     return desc
@@ -557,8 +774,8 @@ def ffkm_mp_wrapper(args):
 
     try:
         for smiles in smi:
-            if cyclic:
-                mol = poly.make_cyclicpolymer(smiles, n=cyclic, return_mol=True)
+            if cyclic > 0 and smiles.count('*') == 2:
+                mol = poly.make_cyclicpolymer(smiles, n=cyclic, return_mol=True, removeHs=False)
             else:
                 mol = Chem.MolFromSmiles(smiles)
                 mol = Chem.AddHs(mol)
@@ -571,11 +788,15 @@ def ffkm_mp_wrapper(args):
             desc = descobj.ff_kernel_mean(mols, ratio=ratio, nk=nk, kernel=kernel,
                                           s=s, s_mass=s_mass, mu=mu, mu_mass=mu_mass, ignoreH=ignoreH)
         else:
-            utils.radon_print('Fail to assign force field. %s' % (','.join(smi)), level=2)
+            utils.radon_print('Fail to assign force field. %s' % (str(','.join(smi))), level=2)
             desc = np.full(len(descobj.ffkm_desc_names(nk=nk)), np.nan)
 
-    except:
-        utils.radon_print('Fail to calculate descriptor. %s' % (','.join(smi)), level=2)
+    except Exception as e:
+        is_str = np.array([isinstance(s, str) for s in smi])
+        if np.all(is_str):
+            utils.radon_print('Fail to calculate descriptor. %s %s' % (str(','.join(smi)), str(e)), level=2)
+        else:
+            utils.radon_print('Fail to calculate descriptor because input SMILES includes illegal data.')
         desc = np.full(len(descobj.ffkm_desc_names(nk=nk)), np.nan)
 
     return desc
@@ -586,8 +807,8 @@ def get_param_mp_wrapper(args):
     utils.restore_const(c)
 
     try:
-        if cyclic:
-            mol = poly.make_cyclicpolymer(smi, n=cyclic, return_mol=True)
+        if cyclic > 0 and smiles.count('*') == 2:
+            mol = poly.make_cyclicpolymer(smi, n=cyclic, return_mol=True, removeHs=False)
         else:
             mol = Chem.MolFromSmiles(smi)
             mol = Chem.AddHs(mol)
@@ -622,11 +843,18 @@ def get_param_mp_wrapper(args):
                      k_bond.tolist(), r0.tolist(), k_ang.tolist(), theta0.tolist(), k_dih.tolist()]
 
     else:
-        utils.radon_print('Fail to assign force field. %s' % (smi), level=2)
+        utils.radon_print('Fail to assign force field. %s' % str(smi), level=2)
         if descobj.polar:
             param = np.full((10, 1), np.nan).tolist()
         else:
             param = np.full((9, 1), np.nan).tolist()
 
     return param
+
+
+def mic_mp_wrapper(args):
+    x, y = args
+    mine = MINE()
+    mine.compute_score(x, y)
+    return mine.mic()
 

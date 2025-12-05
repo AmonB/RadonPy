@@ -1,4 +1,4 @@
-#  Copyright (c) 2024. RadonPy developers. All rights reserved.
+#  Copyright (c) 2023. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -18,7 +18,7 @@ from rdkit import Geometry as Geom
 from ..core import calc, poly, const, utils
 from ..ff import ff_class
 
-__version__ = '0.2.10'
+__version__ = '0.3.0b3'
 
 mdtraj_avail = True
 try:
@@ -111,6 +111,9 @@ class LAMMPS():
         else:
             opt_flag = False
 
+        if mpi != 0:
+            mpi = check_mpirun(mpi)
+
         if mpi > 0:
             mpi_cmd = const.mpi_cmd % (mpi)
         elif mpi == 0:
@@ -196,7 +199,7 @@ class LAMMPS():
                 % (self.get_name, input_file, md.dat_file, cp.returncode), level=3)
             return cp.returncode
 
-        if isinstance(mol, Chem.Mol) and last_str is not None:
+        if isinstance(mol, Chem.Mol):
             uwstr, wstr, cell, vel, _ = self.read_traj_simple(os.path.join(self.work_dir, last_str))
 
             for i in range(mol.GetNumAtoms()):
@@ -218,11 +221,9 @@ class LAMMPS():
         check_opt = False
         check_gpu = False
 
+        _ = check_mpirun(1)
         try:
-            mpi_cmd = const.mpi_cmd % 1
-            mpi_cmd = mpi_cmd.split()[0]
-
-            cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+            cmd = '%s -h' % (self.solver_path)
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
 
@@ -245,32 +246,8 @@ class LAMMPS():
                         check_gpu = True
 
         except:
-            try:
-                cmd = '%s -h' % self.solver_path
-                cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
-                lines = str(cp.stdout).splitlines()
-
-                flag = False
-                for l in lines:
-                    if 'Installed packages:' in l:
-                        flag = True
-                    elif flag:
-                        if 'OPENMP' in l or 'USER-OMP' in l:
-                            utils.radon_print('OPENMP package is available.', level=1)
-                            check_omp = True
-                        if 'INTEL' in l:
-                            utils.radon_print('INTEL package is available.', level=1)
-                            check_intel = True
-                        if 'OPT' in l:
-                            utils.radon_print('OPT package is available.', level=1)
-                            check_opt = True
-                        if 'GPU' in l:
-                            utils.radon_print('GPU package is available.', level=1)
-                            check_gpu = True
-
-            except:
-                utils.radon_print('Could not obtain package information of LAMMPS.', level=2)
-                return False
+            utils.radon_print('Could not obtain package information of LAMMPS.', level=2)
+            return False
 
         self.package['omp'] = check_omp
         self.package['intel'] = check_intel
@@ -283,26 +260,17 @@ class LAMMPS():
     def get_version(self):
 
         ver = None
+        _ = check_mpirun(1)
         try:
-            mpi_cmd = const.mpi_cmd % 1
-            cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+            cmd = '%s -h' % (self.solver_path)
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
-
+    
             for l in lines:
                 if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
                     ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
         except:
-            try:
-                cmd = '%s -h' % self.solver_path
-                cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
-                lines = str(cp.stdout).splitlines()
-
-                for l in lines:
-                    if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
-                        ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
-            except:
-                return ver
+            return ver
 
         return ver
         
@@ -383,7 +351,7 @@ class LAMMPS():
         indata.append('neigh_modify %s' % (md.neigh_modify))
         indata.append('read_data %s' % (md.dat_file))
         indata.append('')
-        indata.append('thermo_style custom %s' % ' '.join(md.thermo_style))
+        indata.append('thermo_style %s' % (md.thermo_style))
         indata.append('thermo_modify flush yes')
         indata.append('thermo %i' % (md.thermo_freq))
 
@@ -423,13 +391,12 @@ class LAMMPS():
                 indata.append('min_style %s' % (wf.min_style))
                 indata.append('minimize %f %f %i %i' % (wf.etol, wf.ftol, wf.maxiter, wf.maxeval))
                 indata.append('reset_timestep 0')
-
+                
                 if md.dump_file:
                     indata.append('dump dump0 all custom %i %s %s' % (md.dump_freq, md.dump_file, md.dump_style))
                 if md.xtc_file:
                     indata.append('dump xtc0 all xtc %i %s' % (md.dump_freq, md.xtc_file))
                     indata.append('dump_modify xtc0 unwrap yes')
-
                 
             elif wf.type == 'md':
                 unfix = []
@@ -645,19 +612,10 @@ class LAMMPS():
                     indata.append('fix momentum%i all momentum 1000 linear 1 1 1 rescale' % (i+1))
                     unfix.append('unfix momentum%i' % (i+1))
 
-                # Update thermo_style
-                indata.append('')
-                indata.append('# Update thermo_style')
-                self.update_thermo_style(md, wf, i, indata, unfix)
 
-                if wf.rerun:
-                    indata.append('')
-                    indata.append('rerun %s %s' % (wf.rerun_dump, wf.rerun_keyword))
-                else:
-                    indata.append('')
-                    indata.append('run %i' % (wf.step))
-                    
-                indata.append('unfix md%i' % (i+1))    
+                indata.append('')
+                indata.append('run %i' % (wf.step))
+                indata.append('unfix md%i' % (i+1))
                 indata.extend(unfix)
                 if len(wf.add_f) > 0:
                     indata.extend(wf.add_f)
@@ -667,8 +625,7 @@ class LAMMPS():
             indata.append('run 0')
 
         indata.append('')
-        if md.outstr:
-            indata.append('write_dump all custom %s id x y z xu yu zu vx vy vz fx fy fz modify sort id' % (md.outstr))
+        indata.append('write_dump all custom %s id x y z xu yu zu vx vy vz fx fy fz modify sort id' % (md.outstr))
         if md.write_data:
             indata.append('write_data %s' % (md.write_data))
 
@@ -690,15 +647,6 @@ class LAMMPS():
                 os.fsync(fh.fileno())
 
         return in_file
-
-
-    def update_thermo_style(self, md, wf, i, indata, unfix):
-        indata.append('thermo_style custom %s' % ' '.join([*md.thermo_style, *wf.thermo_style]))
-        indata.append('thermo_modify flush yes')
-        if wf.thermo_freq is not None:
-            indata.append('thermo %i' % (wf.thermo_freq))
-        else:
-            indata.append('thermo %i' % (md.thermo_freq))
 
 
     def make_input_drude(self, md, indata):
@@ -845,10 +793,10 @@ class LAMMPS():
         if not nounfix:
             unfix.append('unfix EF%i' % (i+1))
 
-        wf.thermo_style += ['v_efac']
-        # indata.append('thermo_style %s' % (md.thermo_style))
-        # indata.append('thermo_modify flush yes')
-        # indata.append('thermo %i' % (md.thermo_freq))
+        md.thermo_style += ' v_efac'
+        indata.append('thermo_style %s' % (md.thermo_style))
+        indata.append('thermo_modify flush yes')
+        indata.append('thermo %i' % (md.thermo_freq))
 
         return indata, unfix
 
@@ -862,10 +810,10 @@ class LAMMPS():
 
         unfix.append('uncompute dipole%i' % (i+1))
 
-        wf.thermo_style += ['v_mux', 'v_muy', 'v_muz', 'v_mu']
-        # indata.append('thermo_style %s' % (md.thermo_style))
-        # indata.append('thermo_modify flush yes')
-        # indata.append('thermo %i' % (md.thermo_freq))
+        md.thermo_style += ' v_mux v_muy v_muz v_mu'
+        indata.append('thermo_style %s' % (md.thermo_style))
+        indata.append('thermo_modify flush yes')
+        indata.append('thermo %i' % (md.thermo_freq))
 
         return indata, unfix
 
@@ -892,10 +840,10 @@ class LAMMPS():
         unfix.append('unfix msd%i' % (i+1))
         unfix.append('uncompute msd%i' % (i+1))
 
-        wf.thermo_style += ['v_msd']
-        # indata.append('thermo_style %s' % (md.thermo_style))
-        # indata.append('thermo_modify flush yes')
-        # indata.append('thermo %i' % (md.thermo_freq))
+        md.thermo_style += ' v_msd'
+        indata.append('thermo_style %s' % (md.thermo_style))
+        indata.append('thermo_modify flush yes')
+        indata.append('thermo %i' % (md.thermo_freq))
 
         return indata, unfix
 
@@ -917,12 +865,11 @@ class LAMMPS():
         var_str = ' '.join(wf.timeave_var)
         indata.append('fix %s all ave/time %i %i %i %s' % (wf.timeave_name, wf.timeave_nevery, wf.timeave_nfreq, wf.timeave_nstep, var_str))
 
-        wf.thermo_style += ['f_%s[%i]' % (wf.timeave_name, (j+1)) for j in range(len(wf.timeave_var))]
-        # fix_name = ' '.join(['f_%s[%i]' % (wf.timeave_name, (j+1)) for j in range(len(wf.timeave_var))])
-        # md.thermo_style += ' %s' % fix_name
-        # indata.append('thermo_style %s' % (md.thermo_style))
-        # indata.append('thermo_modify flush yes')
-        # indata.append('thermo %i' % (md.thermo_freq))
+        fix_name = ' '.join(['f_%s[%i]' % (wf.timeave_name, (j+1)) for j in range(len(wf.timeave_var))])
+        md.thermo_style += ' %s' % fix_name
+        indata.append('thermo_style %s' % (md.thermo_style))
+        indata.append('thermo_modify flush yes')
+        indata.append('thermo %i' % (md.thermo_freq))
 
         return indata, unfix
 
@@ -1112,7 +1059,29 @@ class LAMMPS():
 
         return uwstr, wstr, np.array(cell), v, f
 
+def check_mpirun(mpi):
+    """Check if mpirun is available
+ 
+     Args:
+         mpi: Number of cpus to use
+ 
+     Return:
+         mpi: Number of cpus to use
+    """
+    try:
+        mpi_exec = const.mpi_cmd.split()[0] if const.mpi_cmd else 'mpirun'
+        cp_check = subprocess.run([mpi_exec, '--version'], 
+                     stdout=subprocess.PIPE, 
+                     stderr=subprocess.PIPE, 
+                     timeout=5)
+        if cp_check.returncode != 0:
+            mpi = 0
+            utils.radon_print('mpirun is not available. Parallel number of MPI is changed to zero.', level=2)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        mpi = 0
+        utils.radon_print('mpirun is not available. Parallel number of MPI is changed to zero.', level=2)
 
+    return mpi
 
 
 ###########################################
@@ -1120,8 +1089,8 @@ class LAMMPS():
 ###########################################
 
 class Analyze():
-    def __init__(self, log_file='radon_md.log', ignore_log=[], **kwargs):
-        self.dfs = self.read_log(log_file, ignore_log=ignore_log)
+    def __init__(self, log_file='radon_md.log', **kwargs):
+        self.dfs = self.read_log(log_file)
         self.log_file = log_file
         self.in_file = kwargs.get('in_file', 'radon_md.dump')
         self.dat_file = kwargs.get('dat_file', 'radon_md_lmp.data')
@@ -1176,7 +1145,7 @@ class Analyze():
         self.volexp_sma_sd_crit = kwargs.get('volexp_sma_sd_crit', None)
 
 
-    def read_log(self, log_file, ignore_log=[]):
+    def read_log(self, log_file):
         """
         lammps.Analyze.read_log
 
@@ -1193,7 +1162,7 @@ class Analyze():
             log_data = [s.replace('\n', '').replace('\r', '') for s in fh.readlines()]
 
         try:
-            dfs = self.parse_thermo(log_data, ignore_log=ignore_log)
+            dfs = self.parse_thermo(log_data)
             self.dfs = dfs
         except Exception as e:
             self.dfs = dfs = None
@@ -1203,7 +1172,7 @@ class Analyze():
 
 
     @classmethod
-    def parse_thermo(cls, log_data, ignore_log=[]):
+    def parse_thermo(cls, log_data):
         """
         lammps.Analyze.parse_thermo
 
@@ -1237,13 +1206,6 @@ class Analyze():
                 data = []
             elif d_flag == 2:
                 try:
-                    ignore_flag = False
-                    for ignore_line in ignore_log:
-                        if ignore_line in line:
-                            ignore_flag = True
-                            break
-                    if ignore_flag:
-                        continue
                     data.append([float(f) for f in line.split()])
                 except ValueError as e:
                     utils.radon_print('Can not parse thermodynamic data. %s; Skip to parse the data of %i step.' % (e, len(dfs)), level=1)
@@ -2621,33 +2583,24 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
     p_mass = []
     p_coeff = []
     i = 0
-
-    if not mol.HasProp('pair_style'):
-        utils.radon_print('pair_style is missing in MolToLAMMPSdataBlock. Assuming lj for pair_style.', level=2)
-        mol.SetProp('pair_style', 'lj')
     for atom in mol.GetAtoms():
-        if atom.GetSymbol() == 'H' and atom.GetIsotope() == 3:
+        if atom.GetSymbol() == 'H' and atom.GetIsotope() >= 3:
             ptype = '%s,0' % atom.GetProp('ff_type')
         else:
             ptype = '%s,%i' % (atom.GetProp('ff_type'), atom.GetIsotope())
+            
         if ptype in unique_ptype:
             atom.SetIntProp('ff_type_num', unique_ptype.index(ptype)+1)
         else:
             i += 1
             unique_ptype.append(ptype)
             p_mass.append(atom.GetMass())
-            if mol.GetProp('pair_style') == 'lj':
-                p_coeff.append([atom.GetDoubleProp('ff_epsilon'), atom.GetDoubleProp('ff_sigma')])
-            else:
-                utils.radon_print('pair_style %s is not available.' % mol.GetProp('pair_style'), level=3)
+            p_coeff.append([atom.GetDoubleProp('ff_epsilon'), atom.GetDoubleProp('ff_sigma')])
             atom.SetIntProp('ff_type_num', i)
 
     unique_btype = []
     b_coeff = []
     i = 0
-    if not mol.HasProp('bond_style'):
-        utils.radon_print('bond_style is missing in MolToLAMMPSdataBlock. Assuming harmonic for bond_style.', level=2)
-        mol.GetProp('bond_style', 'harmonic')
     for bond in mol.GetBonds():
         btype = bond.GetProp('ff_type')
         if btype in unique_btype:
@@ -2655,74 +2608,49 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         else:
             i += 1
             unique_btype.append(btype)
-            if mol.GetProp('bond_style') == 'harmonic':
-                b_coeff.append([bond.GetDoubleProp('ff_k'), bond.GetDoubleProp('ff_r0')])
-            else:
-                utils.radon_print('bond_style %s is not available.' % mol.GetProp('bond_style'), level=3)
+            b_coeff.append([bond.GetDoubleProp('ff_k'), bond.GetDoubleProp('ff_r0')])
             bond.SetIntProp('ff_type_num', i)
 
     unique_atype = []
     a_coeff = []
     i = 0
-    if not mol.HasProp('angle_style'):
-        utils.radon_print('angle_style is missing in MolToLAMMPSdataBlock. Assuming harmonic for angle_style.', level=2)
-        mol.SetProp('angle_style', 'harmonic')
     if hasattr(mol, 'angles'):
-        for angle in mol.angles:
+        for angle in mol.angles.values():
             if angle.ff.type in unique_atype:
                 angle.ff.type_num = unique_atype.index(angle.ff.type)+1
             else:
                 i += 1
                 unique_atype.append(angle.ff.type)
-                if mol.GetProp('angle_style') == 'harmonic':
-                    a_coeff.append([angle.ff.k, angle.ff.theta0])
-                else:
-                    utils.radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
+                a_coeff.append([angle.ff.k, angle.ff.theta0])
                 angle.ff.type_num = i
 
     unique_dtype = []
     d_coeff = []
     i = 0
-    if not mol.HasProp('dihedral_style'):
-        utils.radon_print('dihedral_style is missing in MolToLAMMPSdataBlock. Assuming fourier for dihedral_style.', level=2)
-        mol.SetProp('dihedral_style', 'fourier')
     if hasattr(mol, 'dihedrals'):
-        for dihedral in mol.dihedrals:
+        for dihedral in mol.dihedrals.values():
             if dihedral.ff.type in unique_dtype:
                 dihedral.ff.type_num = unique_dtype.index(dihedral.ff.type)+1
             else:
                 i += 1
                 unique_dtype.append(dihedral.ff.type)
-                if mol.GetProp('dihedral_style') == 'fourier':
-                    coeff = [dihedral.ff.m]
-                    for j in range(len(dihedral.ff.k)):
-                        coeff.extend([dihedral.ff.k[j], dihedral.ff.n[j], dihedral.ff.d0[j]])
-                    d_coeff.append(coeff)
-                elif mol.GetProp('dihedral_style') == 'harmonic':
-                    d_coeff.append([dihedral.ff.k, dihedral.ff.d0, dihedral.ff.n])
-                else:
-                    utils.radon_print('dihedral_style %s is not available.' % mol.GetProp('dihedral_style'), level=3)
+                coeff = [dihedral.ff.m]
+                for j in range(len(dihedral.ff.k)):
+                    coeff.extend([dihedral.ff.k[j], dihedral.ff.n[j], dihedral.ff.d0[j]])
+                d_coeff.append(coeff)
                 dihedral.ff.type_num = i
 
     unique_itype = []
     i_coeff = []
     i = 0
-    if not mol.HasProp('improper_style'):
-        utils.radon_print('improper_style is missing in MolToLAMMPSdataBlock. Assuming cvff for improper_style.', level=2)
-        mol.SetProp('improper_style', 'cvff')
     if hasattr(mol, 'impropers'):
-        for improper in mol.impropers:
+        for improper in mol.impropers.values():
             if improper.ff.type in unique_itype:
                 improper.ff.type_num = unique_itype.index(improper.ff.type)+1
             else:
                 i += 1
                 unique_itype.append(improper.ff.type)
-                if mol.GetProp('improper_style') == 'cvff':
-                    i_coeff.append([improper.ff.k, improper.ff.d0, improper.ff.n])
-                elif mol.GetProp('improper_style') == 'umbrella':
-                    i_coeff.append([improper.ff.k, improper.ff.x0])
-                else:
-                    utils.radon_print('improper_style %s is not available.' % mol.GetProp('improper_style'), level=3)
+                i_coeff.append([improper.ff.k, improper.ff.d0, improper.ff.n])
                 improper.ff.type_num = i
 
     utils.set_mol_id(mol)
@@ -2767,9 +2695,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, ptype in enumerate(unique_ptype):
-            c = '\t'.join([ '%f' % x for x in p_coeff[i] ])
-            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, p_coeff[i][0], p_coeff[i][1], ptype))
-            lines.append('%5d\t%s\t# %s' % (i+1, c, ptype))
+            lines.append('%5d\t%f\t%f\t# %s' % (i+1, p_coeff[i][0], p_coeff[i][1], ptype))
 
 
     if len(unique_btype) > 0:
@@ -2778,9 +2704,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, btype in enumerate(unique_btype):
-            c = '\t'.join([ '%f' % x for x in b_coeff[i] ])
-            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, b_coeff[i][0], b_coeff[i][1], btype))
-            lines.append('%5d\t%s\t# %s' % (i+1, c, btype))
+            lines.append('%5d\t%f\t%f\t# %s' % (i+1, b_coeff[i][0], b_coeff[i][1], btype))
 
 
     if len(unique_atype) > 0:
@@ -2789,9 +2713,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, atype in enumerate(unique_atype):
-            c = '\t'.join([ '%f' % x for x in a_coeff[i] ])
-            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, a_coeff[i][0], a_coeff[i][1], atype))
-            lines.append('%5d\t%s\t# %s' % (i+1, c, atype))
+            lines.append('%5d\t%f\t%f\t# %s' % (i+1, a_coeff[i][0], a_coeff[i][1], atype))
 
 
     if len(unique_dtype) > 0:
@@ -2800,14 +2722,11 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, dtype in enumerate(unique_dtype):
-            # string = '%5d\t%i' % (i+1, d_coeff[i][0])
-            # for j in range(d_coeff[i][0]):
-            #     string += '\t%f\t%i\t%f' % (d_coeff[i][j*3+1], d_coeff[i][j*3+2], d_coeff[i][j*3+3])
-            # string += '\t# %s' % (dtype)
-            # lines.append(string)
-            c = '\t'.join([ '%f' % x if isinstance(x, float) else '%i' % x for x in d_coeff[i]])
-            lines.append('%5d\t%s\t# %s' % (i+1, c, dtype))
-
+            string = '%5d\t%i' % (i+1, d_coeff[i][0])
+            for j in range(d_coeff[i][0]):
+                string += '\t%f\t%i\t%f' % (d_coeff[i][j*3+1], d_coeff[i][j*3+2], d_coeff[i][j*3+3])
+            string += '\t# %s' % (dtype)
+            lines.append(string)
 
     if len(unique_itype) > 0:
         lines.append('')
@@ -2815,9 +2734,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, itype in enumerate(unique_itype):
-            #lines.append('%5d\t%f\t%i\t%i\t# %s' % (i+1, i_coeff[i][0], i_coeff[i][1], i_coeff[i][2], itype))
-            c = '\t'.join([ '%f' % x if isinstance(x, float) else '%i' % x for x in i_coeff[i] ])
-            lines.append('%5d\t%s\t# %s' % (i+1, c, itype))
+            lines.append('%5d\t%f\t%i\t%i\t# %s' % (i+1, i_coeff[i][0], i_coeff[i][1], i_coeff[i][2], itype))
 
 
     if mol.GetNumAtoms() > 0:
@@ -2861,7 +2778,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('Angles')
         lines.append('')
 
-        for i, angle in enumerate(mol.angles):
+        for i, angle in enumerate(mol.angles.values()):
             lines.append('%5d\t%i\t%i\t%i\t%i' %
                 (i+1, angle.ff.type_num, angle.a+1, angle.b+1, angle.c+1))
 
@@ -2870,7 +2787,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('Dihedrals')
         lines.append('')
 
-        for i, dihedral in enumerate(mol.dihedrals):
+        for i, dihedral in enumerate(mol.dihedrals.values()):
             lines.append('%5d\t%i\t%i\t%i\t%i\t%i' %
                 (i+1, dihedral.ff.type_num, dihedral.a+1, dihedral.b+1, dihedral.c+1, dihedral.d+1))
 
@@ -2880,15 +2797,14 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('Impropers')
         lines.append('')
 
-        for i, improper in enumerate(mol.impropers):
+        for i, improper in enumerate(mol.impropers.values()):
             lines.append('%5d\t%i\t%i\t%i\t%i\t%i' %
                 (i+1, improper.ff.type_num, improper.a+1, improper.b+1, improper.c+1, improper.d+1))
 
     return lines
 
 
-def MolFromLAMMPSdata(file_name, bond_order=True,
-    ff_style={'pair':'lj', 'bond':'harmonic', 'angle':'harmonic', 'dihedral':'fourier', 'improper':'cvff'}):
+def MolFromLAMMPSdata(file_name, bond_order=True):
 
     flag = 'init'
     flag2 = False
@@ -2977,11 +2893,8 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    if ff_style['pair'] == 'lj':
-                        epsilon.append(float(vals[1]))
-                        sigma.append(float(vals[2]))
-                    else:
-                        utils.radon_print('pair_style %s is not available.' % ff_style['pair'], level=3)
+                    epsilon.append(float(vals[1]))
+                    sigma.append(float(vals[2]))
 
             elif flag == 'bond_c':
                 if not flag2:
@@ -2991,11 +2904,8 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    if ff_style['bond'] == 'harmonic':
-                        k_bond.append(float(vals[1]))
-                        r0.append(float(vals[2]))
-                    else:
-                        utils.radon_print('bond_style %s is not available.' % ff_style['bond'], level=3)
+                    k_bond.append(float(vals[1]))
+                    r0.append(float(vals[2]))
 
             elif flag == 'angle_c':
                 if not flag2:
@@ -3005,11 +2915,8 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    if ff_style['angle'] == 'harmonic':
-                        k_angle.append(float(vals[1]))
-                        theta0.append(float(vals[2]))
-                    else:
-                        utils.radon_print('angle_style %s is not available.' % ff_style['angle'], level=3)
+                    k_angle.append(float(vals[1]))
+                    theta0.append(float(vals[2]))
 
             elif flag == 'dihed_c':
                 if not flag2:
@@ -3022,22 +2929,14 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     n_dih_tmp = []
                     d0_dih_tmp = []
                     vals = line.split()
-                    if ff_style['dihedral'] == 'fourier':
-                        m_dih.append(int(vals[1]))
-                        for j in range(int(vals[1])):
-                            k_dih_tmp.append(float(vals[j*3+2]))
-                            n_dih_tmp.append(int(vals[j*3+3]))
-                            d0_dih_tmp.append(float(vals[j*3+4]))
-                        k_dih.append(k_dih_tmp)
-                        n_dih.append(n_dih_tmp)
-                        d0_dih.append(d0_dih_tmp)
-                    elif ff_style['dihedral'] == 'harmonic':
-                        k_dih.append(float(vals[1]))
-                        n_dih.append(float(vals[2]))
-                        d0_dih.append(float(vals[3]))
-                    else:
-                        utils.radon_print('dihedral_style %s is not available.' % ff_style['dihedral'], level=3)
-
+                    m_dih.append(int(vals[1]))
+                    for j in range(int(vals[1])):
+                        k_dih_tmp.append(float(vals[j*3+2]))
+                        n_dih_tmp.append(int(vals[j*3+3]))
+                        d0_dih_tmp.append(float(vals[j*3+4]))
+                    k_dih.append(k_dih_tmp)
+                    n_dih.append(n_dih_tmp)
+                    d0_dih.append(d0_dih_tmp)
 
             elif flag == 'impro_c':
                 if not flag2:
@@ -3047,15 +2946,9 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    if ff_style['improper'] == 'cvff':
-                        k_imp.append(float(vals[1]))
-                        d0_imp.append(float(vals[2]))
-                        n_imp.append(int(vals[3]))
-                    elif ff_style['improper'] == 'umbrella':
-                        k_imp.append(float(vals[1]))
-                        d0_imp.append(float(vals[2]))
-                    else:
-                        utils.radon_print('improper_style %s is not available.' % ff_style['improper'], level=3)
+                    k_imp.append(float(vals[1]))
+                    d0_imp.append(float(vals[2]))
+                    n_imp.append(int(vals[3]))
 
             elif flag == 'atom':
                 if not flag2:
@@ -3147,19 +3040,14 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     impro_atom[i-1] = [int(vals[2]), int(vals[3]), int(vals[4]), int(vals[5])]
 
     rwmol = Chem.RWMol()
-    w2ele = {1:'H', 2:'H', 3:'H', 12:'C', 14:'N', 16:'O', 19:'F', 28:'Si', 31:'P', 32:'S', 35:'Cl', 80:'Br', 127:'I'}
+    w2ele = {1:'H', 2:'H', 3:'H', 12:'C', 14:'N', 16:'O', 19:'F', 31:'P', 32:'S', 35:'Cl', 80:'Br', 127:'I'}
 
     for i in range(n_data['atoms']):
         atom_tmp = Chem.Atom(w2ele[round(mass[atom_id[i]-1])])
         atom_tmp.SetProp('ff_type', str(atom_id[i]))
         atom_tmp.SetIntProp('ff_type_num', int(atom_id[i]))
-
-        if ff_style['pair'] == 'lj':
-            atom_tmp.SetDoubleProp('ff_epsilon', float(epsilon[atom_id[i]-1]))
-            atom_tmp.SetDoubleProp('ff_sigma', float(sigma[atom_id[i]-1]))
-        else:
-            utils.radon_print('pair_style %s is not available.' % ff_style['pair'], level=3)
-
+        atom_tmp.SetDoubleProp('ff_epsilon', float(epsilon[atom_id[i]-1]))
+        atom_tmp.SetDoubleProp('ff_sigma', float(sigma[atom_id[i]-1]))
         atom_tmp.SetDoubleProp('AtomicCharge', float(charge[i]))
         atom_tmp.SetIntProp('mol_id', int(mol_id[i]))
         if int(mass[atom_id[i]-1]) == 2: atom_tmp.SetIsotope(2)
@@ -3281,56 +3169,33 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
         bond_idx = rwmol.AddBond(a_idx, b_idx, order=b_order)
         rwmol.GetBondWithIdx(bond_idx-1).SetProp('ff_type', str(bond_id[i]))
         rwmol.GetBondWithIdx(bond_idx-1).SetIntProp('ff_type_num', int(bond_id[i]))
-        if ff_style['bond'] == 'harmonic':
-            rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_k', float(k_bond[bond_id[i]-1]))
-            rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_r0', float(r0[bond_id[i]-1]))
-        else:
-            utils.radon_print('bond_style %s is not available.' % ff_style['bond'], level=3)
+        rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_k', float(k_bond[bond_id[i]-1]))
+        rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_r0', float(r0[bond_id[i]-1]))
 
     if bond_order: Chem.SanitizeMol(rwmol)
     mol = rwmol.GetMol()
 
     if 'angles' in n_data.keys():
         for i in range(n_data['angles']):
-            if ff_style['angle'] == 'harmonic':
-                angle_ff_tmp = ff_class.Angle_harmonic(ff_type=angle_id[i], k=k_angle[angle_id[i]-1], theta0=theta0[angle_id[i]-1])
-            else:
-                utils.radon_print('angle_style %s is not available.' % ff_style['angle'], level=3)
+            angle_ff_tmp = ff_class.GAFF_Angle(ff_type=angle_id[i], k=k_angle[angle_id[i]-1], theta0=theta0[angle_id[i]-1])
             utils.add_angle(mol, angle_atom[i][0]-1, angle_atom[i][1]-1, angle_atom[i][2]-1, ff=angle_ff_tmp)
     else:
-        setattr(mol, 'angles', [])
+        setattr(mol, 'angles', {})
 
     if 'dihedrals' in n_data.keys():
         for i in range(n_data['dihedrals']):
-            if ff_style['dihedral'] == 'fourier':
-                dihed_ff_tmp = ff_class.Dihedral_fourier(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
-                                       m=m_dih[dihed_id[i]-1], n=n_dih[dihed_id[i]-1])
-            elif ff_style['dihedral'] == 'harmonic':
-                dihed_ff_tmp = ff_class.Dihedral_harmonic(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
-                                       n=n_dih[dihed_id[i]-1])
-            else:
-                utils.radon_print('dihedral_style %s is not available.' % ff_style['dihedral'], level=3)
+            dihed_ff_tmp = ff_class.GAFF_Dihedral(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
+                                   m=m_dih[dihed_id[i]-1], n=n_dih[dihed_id[i]-1])
             utils.add_dihedral(mol, dihed_atom[i][0]-1, dihed_atom[i][1]-1, dihed_atom[i][2]-1, dihed_atom[i][3]-1, ff=dihed_ff_tmp)
     else:
-        setattr(mol, 'dihedrals', [])
+        setattr(mol, 'dihedrals', {})
 
     if 'impropers' in n_data.keys():
         for i in range(n_data['impropers']):
-            if ff_style['improper'] == 'cvff':
-                impro_ff_tmp = ff_class.Improper_cvff(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], d0=d0_imp[impro_id[i]-1], n=n_imp[impro_id[i]-1])
-            elif ff_style['improper'] == 'umbrella':
-                impro_ff_tmp = ff_class.Improper_umbrella(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], x0=x0_imp[impro_id[i]-1])
-            else:
-                utils.radon_print('improper_style %s is not available.' % ff_style['improper'], level=3)                
+            impro_ff_tmp = ff_class.GAFF_Improper(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], d0=d0_imp[impro_id[i]-1], n=n_imp[impro_id[i]-1])
             utils.add_improper(mol, impro_atom[i][0]-1, impro_atom[i][1]-1, impro_atom[i][2]-1, impro_atom[i][3]-1, ff=impro_ff_tmp)
     else:
-        setattr(mol, 'impropers', [])
-
-    mol.SetProp('pair_style', ff_style['pair']) 
-    mol.SetProp('bond_style', ff_style['bond'])
-    mol.SetProp('angle_style', ff_style['angle'])
-    mol.SetProp('dihedral_style', ff_style['dihedral'])
-    mol.SetProp('improper_style', ff_style['improper'])
+        setattr(mol, 'impropers', {})
 
     setattr(mol, 'cell', utils.Cell(cell_data['xhi'], cell_data['xlo'], cell_data['yhi'], cell_data['ylo'], cell_data['zhi'], cell_data['zlo']))
 

@@ -7,6 +7,7 @@
 # ******************************************************************************
 
 import os
+import re
 import psutil
 from copy import deepcopy
 from itertools import permutations
@@ -15,10 +16,11 @@ import pickle
 import json
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
 from . import const
 from ..ff import ff_class
 
-__version__ = '0.2.10'
+__version__ = '0.3.0b3'
 
 
 class Angle():
@@ -40,7 +42,7 @@ class Angle():
         }
         return dic
 
-    
+
 class Dihedral():
     """
         utils.Dihedral() object
@@ -51,7 +53,7 @@ class Dihedral():
         self.c = c
         self.d = d
         self.ff = ff
-    
+
     def to_dict(self):
         dic = {
             'a': int(self.a),
@@ -62,7 +64,7 @@ class Dihedral():
         }
         return dic
 
-    
+
 class Improper():
     """
         utils.Improper() object
@@ -182,20 +184,13 @@ def count_mols(mol):
 
     Returns:
         Number of molecules (int)
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles("CC.C=C")
-        >>> count_mols(mol)
-        2
-        >>> mol = Chem.MolFromSmiles("c1ccccc1")
-        >>> count_mols(mol)
-        1
     """
+
     fragments = Chem.GetMolFrags(mol, asMols=True)
     return len(fragments)
 
 
-def remove_atom(mol, idx):
+def remove_atom(mol, idx, angle_fix=False):
     """
     utils.remove_atom
 
@@ -205,69 +200,85 @@ def remove_atom(mol, idx):
         mol: RDkit Mol object
         idx: Atom index of removing atom in RDkit Mol object
 
+    Options:
+        angle_fix: Fix information of bond angles, dihedral angles, and improper angles. (boolean)
+
     Returns:
         RDkit Mol object
     """
 
-    angles_copy = []
-    dihedrals_copy = []
-    impropers_copy = []
-    cell_copy = None
+    angles_copy = {}
+    dihedrals_copy = {}
+    impropers_copy = {}
+    cell_copy = mol.cell if hasattr(mol, 'cell') else None
 
-    if hasattr(mol, 'cell'):
-        cell_copy = mol.cell
+    if angle_fix:
+        if hasattr(mol, 'impropers'):
+            for imp in mol.impropers.values():
+                imp_idx = {imp.a, imp.b, imp.c, imp.d}
+                if idx in imp_idx:
+                    continue
 
-    if hasattr(mol, 'impropers'):
-        for imp in mol.impropers:
-            if idx in [imp.a, imp.b, imp.c, imp.d]:
-                continue
-            idx_a = imp.a if imp.a < idx else imp.a-1
-            idx_b = imp.b if imp.b < idx else imp.b-1
-            idx_c = imp.c if imp.c < idx else imp.c-1
-            idx_d = imp.d if imp.d < idx else imp.d-1
-            impropers_copy.append(
-                Improper(
-                    a=idx_a,
-                    b=idx_b,
-                    c=idx_c,
-                    d=idx_d,
-                    ff=deepcopy(imp.ff)
-                )
-            )
+                if max(imp_idx) < idx:
+                    key = '%i,%i,%i,%i' % (imp.a, imp.b, imp.c, imp.d)
+                    impropers_copy[key] = imp
+                else:
+                    idx_a = imp.a if imp.a < idx else imp.a-1
+                    idx_b = imp.b if imp.b < idx else imp.b-1
+                    idx_c = imp.c if imp.c < idx else imp.c-1
+                    idx_d = imp.d if imp.d < idx else imp.d-1
+                    key = '%i,%i,%i,%i' % (idx_a, idx_b, idx_c, idx_d)
+                    impropers_copy[key] = Improper(
+                                                a=idx_a,
+                                                b=idx_b,
+                                                c=idx_c,
+                                                d=idx_d,
+                                                ff=imp.ff
+                                            )
 
-    if hasattr(mol, 'dihedrals'):
-        for dih in mol.dihedrals:
-            if idx in [dih.a, dih.b, dih.c, dih.d]:
-                continue
-            idx_a = dih.a if dih.a < idx else dih.a-1
-            idx_b = dih.b if dih.b < idx else dih.b-1
-            idx_c = dih.c if dih.c < idx else dih.c-1
-            idx_d = dih.d if dih.d < idx else dih.d-1
-            dihedrals_copy.append(
-                Dihedral(
-                    a=idx_a,
-                    b=idx_b,
-                    c=idx_c,
-                    d=idx_d,
-                    ff=deepcopy(dih.ff)
-                )
-            )
+        if hasattr(mol, 'dihedrals'):
+            for dih in mol.dihedrals.values():
+                dih_idx = {dih.a, dih.b, dih.c, dih.d}
+                if idx in dih_idx:
+                    continue
 
-    if hasattr(mol, 'angles'):
-        for angle in mol.angles:
-            if idx in [angle.a, angle.b, angle.c]:
-                continue
-            idx_a = angle.a if angle.a < idx else angle.a-1
-            idx_b = angle.b if angle.b < idx else angle.b-1
-            idx_c = angle.c if angle.c < idx else angle.c-1
-            angles_copy.append(
-                Angle(
-                    a=idx_a,
-                    b=idx_b,
-                    c=idx_c,
-                    ff=deepcopy(angle.ff)
-                )
-            )
+                if max(dih_idx) < idx:
+                    key = '%i,%i,%i,%i' % (dih.a, dih.b, dih.c, dih.d)
+                    dihedrals_copy.append(dih)
+                else:
+                    idx_a = dih.a if dih.a < idx else dih.a-1
+                    idx_b = dih.b if dih.b < idx else dih.b-1
+                    idx_c = dih.c if dih.c < idx else dih.c-1
+                    idx_d = dih.d if dih.d < idx else dih.d-1
+                    key = '%i,%i,%i,%i' % (idx_a, idx_b, idx_c, idx_d)
+                    dihedrals_copy[key] = Dihedral(
+                                                a=idx_a,
+                                                b=idx_b,
+                                                c=idx_c,
+                                                d=idx_d,
+                                                ff=dih.ff
+                                            )
+
+        if hasattr(mol, 'angles'):
+            for angle in mol.angles.values():
+                ang_idx = {angle.a, angle.b, angle.c}
+                if idx in ang_idx:
+                    continue
+
+                if max(ang_idx) < idx:
+                    key = '%i,%i,%i,%i' % (ang.a, ang.b, ang.c, ang.d)
+                    angles_copy[key] = angle
+                else:
+                    idx_a = angle.a if angle.a < idx else angle.a-1
+                    idx_b = angle.b if angle.b < idx else angle.b-1
+                    idx_c = angle.c if angle.c < idx else angle.c-1
+                    key = '%i,%i,%i,%i' % (idx_a, idx_b, idx_c)
+                    angles_copy[key] = Angle(
+                                            a=idx_a,
+                                            b=idx_b,
+                                            c=idx_c,
+                                            ff=angle.ff
+                                        )
 
     rwmol = Chem.RWMol(mol)
     for pb in mol.GetAtomWithIdx(idx).GetNeighbors():
@@ -300,18 +311,18 @@ def add_bond(mol, idx1, idx2, order=Chem.rdchem.BondType.SINGLE):
     """
 
     # Copy the extended attributes
-    angles_copy = mol.angles if hasattr(mol, 'angles') else []
-    dihedrals_copy = mol.dihedrals if hasattr(mol, 'dihedrals') else []
-    impropers_copy = mol.impropers if hasattr(mol, 'impropers') else []
+    #angles_copy = mol.angles.copy() if hasattr(mol, 'angles') else {}
+    #dihedrals_copy = mol.dihedrals.copy() if hasattr(mol, 'dihedrals') else {}
+    #impropers_copy = mol.impropers.copy() if hasattr(mol, 'impropers') else {}
     cell_copy = mol.cell if hasattr(mol, 'cell') else None
 
     rwmol = Chem.RWMol(mol)
     rwmol.AddBond(idx1, idx2, order=order)
     mol = rwmol.GetMol()
 
-    setattr(mol, 'angles', angles_copy)
-    setattr(mol, 'dihedrals', dihedrals_copy)
-    setattr(mol, 'impropers', impropers_copy)
+    setattr(mol, 'angles', {})
+    setattr(mol, 'dihedrals', {})
+    setattr(mol, 'impropers', {})
     if cell_copy is not None: setattr(mol, 'cell', cell_copy)
 
     return mol
@@ -332,18 +343,18 @@ def remove_bond(mol, idx1, idx2):
     """
 
     # Copy the extended attributes
-    angles_copy = mol.angles if hasattr(mol, 'angles') else []
-    dihedrals_copy = mol.dihedrals if hasattr(mol, 'dihedrals') else []
-    impropers_copy = mol.impropers if hasattr(mol, 'impropers') else []
+    #angles_copy = mol.angles.copy() if hasattr(mol, 'angles') else {}
+    #dihedrals_copy = mol.dihedrals.copy() if hasattr(mol, 'dihedrals') else {}
+    #impropers_copy = mol.impropers.copy() if hasattr(mol, 'impropers') else {}
     cell_copy = mol.cell if hasattr(mol, 'cell') else None
 
     rwmol = Chem.RWMol(mol)
     rwmol.RemoveBond(idx1, idx2)
     mol = rwmol.GetMol()
 
-    setattr(mol, 'angles', angles_copy)
-    setattr(mol, 'dihedrals', dihedrals_copy)
-    setattr(mol, 'impropers', impropers_copy)
+    setattr(mol, 'angles', {})
+    setattr(mol, 'dihedrals', {})
+    setattr(mol, 'impropers', {})
     if cell_copy is not None: setattr(mol, 'cell', cell_copy)
 
     return mol
@@ -364,16 +375,10 @@ def add_angle(mol, a, b, c, ff=None):
     """
 
     if not hasattr(mol, 'angles'):
-        setattr(mol, 'angles', [])
+        setattr(mol, 'angles', {})
 
-    mol.angles.append(
-        Angle(
-            a=a,
-            b=b,
-            c=c,
-            ff=ff
-        )
-    )
+    key = '%i,%i,%i' % (a, b, c)
+    mol.angles[key] = Angle(a=a, b=b, c=c, ff=ff)
 
     return True
 
@@ -395,11 +400,18 @@ def remove_angle(mol, a, b, c):
     if not hasattr(mol, 'angles'):
         return False
 
-    for i, angle in enumerate(mol.angles):
-        if ((angle.a == a and angle.b == b and angle.c == c) or
-            (angle.c == a and angle.b == b and angle.a == c)):
-            del mol.angles[i]
-            break
+    # for i, angle in enumerate(mol.angles:
+    #     if ((angle.a == a and angle.b == b and angle.c == c) or
+    #         (angle.c == a and angle.b == b and angle.a == c)):
+    #         del mol.angles[i]
+    #         break
+
+    key1 = '%i,%i,%i' % (a, b, c)
+    key2 = '%i,%i,%i' % (c, b, a)
+    if key1 in mol.angles:
+        del mol.angles[key1]
+    elif key2 in mol.angles:
+        del mol.angles[key2]
 
     return True
 
@@ -419,17 +431,10 @@ def add_dihedral(mol, a, b, c, d, ff=None):
     """
 
     if not hasattr(mol, 'dihedrals'):
-        setattr(mol, 'dihedrals', [])
+        setattr(mol, 'dihedrals', {})
 
-    mol.dihedrals.append(
-        Dihedral(
-            a=a,
-            b=b,
-            c=c,
-            d=d,
-            ff=ff
-        )
-    )
+    key = '%i,%i,%i,%i' % (a, b, c, d)
+    mol.dihedrals[key] = Dihedral(a=a, b=b, c=c, d=d, ff=ff)
 
     return True
     
@@ -451,11 +456,18 @@ def remove_dihedral(mol, a, b, c, d):
     if not hasattr(mol, 'dihedrals'):
         return False
 
-    for i, dihedral in enumerate(mol.dihedrals):
-        if ((dihedral.a == a and dihedral.b == b and dihedral.c == c and dihedral.d == d) or
-            (dihedral.d == a and dihedral.c == b and dihedral.b == c and dihedral.a == d)):
-            del mol.dihedrals[i]
-            break
+    # for i, dihedral in enumerate(mol.dihedrals):
+    #     if ((dihedral.a == a and dihedral.b == b and dihedral.c == c and dihedral.d == d) or
+    #         (dihedral.d == a and dihedral.c == b and dihedral.b == c and dihedral.a == d)):
+    #         del mol.dihedrals[i]
+    #         break
+
+    key1 = '%i,%i,%i,%i' % (a, b, c, d)
+    key2 = '%i,%i,%i,%i' % (d, c, b, a)
+    if key1 in mol.dihedrals:
+        del mol.dihedrals[key1]
+    elif key2 in mol.dihedrals:
+        del mol.dihedrals[key2]
 
     return True
 
@@ -475,17 +487,10 @@ def add_improper(mol, a, b, c, d, ff=None):
     """
 
     if not hasattr(mol, 'impropers'):
-        setattr(mol, 'impropers', [])
+        setattr(mol, 'impropers', {})
 
-    mol.impropers.append(
-        Improper(
-            a=a,
-            b=b,
-            c=c,
-            d=d,
-            ff=ff
-        )
-    )
+    key = '%i,%i,%i,%i' % (a, b, c, d)
+    mol.impropers[key] = Improper(a=a, b=b, c=c, d=d, ff=ff)
 
     return True
     
@@ -507,15 +512,21 @@ def remove_improper(mol, a, b, c, d):
     if not hasattr(mol, 'impropers'):
         return False
 
-    match = False
-    for i, improper in enumerate(mol.impropers):
-        if improper.a == a:
-            for perm in permutations([b, c, d], 3):
-                if improper.b == perm[0] and improper.c == perm[1] and improper.d == perm[2]:
-                    del mol.impropers[i]
-                    match = True
-                    break
-            if match: break
+    # match = False
+    # for i, improper in enumerate(mol.impropers):
+    #     if improper.a == a:
+    #         for perm in permutations([b, c, d], 3):
+    #             if improper.b == perm[0] and improper.c == perm[1] and improper.d == perm[2]:
+    #                 del mol.impropers[i]
+    #                 match = True
+    #                 break
+    #         if match: break
+
+    for perm in permutations([b, c, d], 3):
+        key = '%i,%i,%i,%i' % (a, perm[0], perm[1], perm[2])
+        if key in mol.impropers:
+            del mol.impropers[key]
+            break
 
     return True
 
@@ -780,93 +791,89 @@ def MolToJSON_dict(mol, useRDKitExtensions=False):
  
     # angle
     if hasattr(mol, 'angles'):
-        if len(mol.angles) > 0 and hasattr(mol.angles[0], 'to_dict'):
-            angle_prop = [ang.to_dict() for ang in mol.angles]
+        # if len(mol.angles) > 0 and hasattr(mol.angles[list(mol.angles.keys())[0]], 'to_dict'):
+            angle_prop = [ang.to_dict() for key, ang in mol.angles.items()]
             radonpy_ext['angles'] = angle_prop
-        else:
-            angle_prop = []
-            for ang in mol.angles:
-                dic = {
-                    'a': int(ang.a),
-                    'b': int(ang.b),
-                    'c': int(ang.c),
-                    'ff': {
-                        'ff_type': str(ang.ff.type),
-                        'k': float(ang.ff.k),
-                        'theta0': float(ang.ff.theta0),
-                    }
-                }
-                angle_prop.append(dic)
-            radonpy_ext['angles'] = angle_prop
+        # else:
+        #     angle_prop = []
+        #     for key, ang in mol.angles.items():
+        #         dic = {
+        #             'a': ang.a,
+        #             'b': ang.b,
+        #             'c': ang.c,
+        #             'ff': {
+        #                 'ff_type': ang.ff.type,
+        #                 'k': ang.ff.k,
+        #                 'theta0': ang.ff.theta0,
+        #             }
+        #         }
+        #         angle_prop.append(dic)
     else:
         angle_prop = []
     
     # dihedral
     if hasattr(mol, 'dihedrals'):
-        if len(mol.dihedrals) > 0 and hasattr(mol.dihedrals[0], 'to_dict'):
-            dihedral_prop = [dih.to_dict() for dih in mol.dihedrals]
+        # if len(mol.dihedrals) > 0 and hasattr(mol.dihedrals[list(mol.dihedrals.keys())[0]], 'to_dict'):
+            dihedral_prop = [dih.to_dict() for key, dih in mol.dihedrals.items()]
             radonpy_ext['dihedrals'] = dihedral_prop
-        else:
-            dihedral_prop = []
-            for dih in mol.dihedrals:
-                dic = {
-                    'a': int(dih.a),
-                    'b': int(dih.b),
-                    'c': int(dih.c),
-                    'd': int(dih.d),
-                    'ff': {
-                        'ff_type': str(dih.ff.type),
-                        'k': list([float(x) for x in dih.ff.k]),
-                        'd0': list([float(x) for x in dih.ff.d0]),
-                        'm': int(dih.ff.m),
-                        'n': list([int(x) for x in dih.ff.n]),
-                    }
-                }
-                dihedral_prop.append(dic)
-            radonpy_ext['dihedrals'] = dihedral_prop
+        # else:
+        #     dihedral_prop = []
+        #     for key, dih in mol.dihedrals.items():
+        #         dic = {
+        #             'a': dih.a,
+        #             'b': dih.b,
+        #             'c': dih.c,
+        #             'd': dih.d,
+        #             'ff': {
+        #                 'ff_type': dih.ff.type,
+        #                 'k': dih.ff.k,
+        #                 'd0': dih.ff.d0,
+        #                 'm': dih.ff.m,
+        #                 'n': dih.ff.n,
+        #             }
+        #         }
+        #         dihedral_prop.append(dic)
     else:
         dihedral_prop = []
 
     # improper
     if hasattr(mol, 'impropers'):
-        if len(mol.impropers) > 0 and hasattr(mol.impropers[0], 'to_dict'):
-            improper_prop = [imp.to_dict() for imp in mol.impropers]
+        # if len(mol.impropers) > 0 and hasattr(mol.impropers[list(mol.impropers.keys())[0]], 'to_dict'):
+            improper_prop = [imp.to_dict() for key, imp in mol.impropers.items()]
             radonpy_ext['impropers'] = improper_prop
-        else:
-            improper_prop = []
-            for imp in mol.impropers:
-                dic = {
-                    'a': int(imp.a),
-                    'b': int(imp.b),
-                    'c': int(imp.c),
-                    'd': int(imp.d),
-                    'ff': {
-                        'ff_type': str(imp.ff.type),
-                        'k': float(imp.ff.k),
-                        'd0': int(imp.ff.d0),
-                        'n': int(imp.ff.n),
-                    }
-                }
-                improper_prop.append(dic)
-            radonpy_ext['impropers'] = improper_prop
+        # else:
+        #     improper_prop = []
+        #     for key, imp in mol.impropers.items():
+        #         dic = {
+        #             'a': imp.a,
+        #             'b': imp.b,
+        #             'c': imp.c,
+        #             'd': imp.d,
+        #             'ff': {
+        #                 'ff_type': imp.ff.type,
+        #                 'k': imp.ff.k,
+        #                 'd0': imp.ff.d0,
+        #                 'n': imp.ff.n,
+        #             }
+        #         }
+        #         improper_prop.append(dic)
     else:
         improper_prop = []
 
     # cell
     if hasattr(mol, 'cell'):
-        if hasattr(mol.cell, 'to_dict'):
+        # if hasattr(mol.cell, 'to_dict'):
             cell_prop = mol.cell.to_dict()
             radonpy_ext['cell'] = cell_prop
-        else:
-            cell_prop = {
-                'xhi': float(mol.cell.xhi),
-                'xlo': float(mol.cell.xlo),
-                'yhi': float(mol.cell.yhi),
-                'ylo': float(mol.cell.ylo),
-                'zhi': float(mol.cell.zhi),
-                'zlo': float(mol.cell.zlo),
-            }
-            radonpy_ext['cell'] = cell_prop
+        # else:
+        #     cell_prop = {
+        #         'xhi': mol.cell.xhi,
+        #         'xlo': mol.cell.xlo,
+        #         'yhi': mol.cell.yhi,
+        #         'ylo': mol.cell.ylo,
+        #         'zhi': mol.cell.zhi,
+        #         'zlo': mol.cell.zlo,
+        #     }
 
     json_dict['molecules'][0]['extensions'].append(radonpy_ext)
 
@@ -876,17 +883,7 @@ def MolToJSON_dict(mol, useRDKitExtensions=False):
 def JSONToMol(file):
     with open(file, mode='r') as f:
         json_dict = json.load(f)
-    mol = JSONToMol_dict(json_dict)
-    return mol
 
-
-def JSONToMol_str(json_str):
-    json_dict = json.loads(json_str)
-    mol = JSONToMol_dict(json_dict)
-    return mol
-
-
-def JSONToMol_dict(json_dict):
     radonpy_ext = None
     for ext in json_dict['molecules'][0]['extensions']:
         if 'name' in ext and ext['name'] == 'radonpy_extention':
@@ -894,17 +891,9 @@ def JSONToMol_dict(json_dict):
     if radonpy_ext is None:
         radon_print('RadonPy extention data was not found in JSON file.', level=3)
 
-    # Avoiding bug in RDKit
-    for b in json_dict['molecules'][0]['bonds']:
-        if 'stereo' in b and 'stereoAtoms' not in b:
-            b['stereo'] = 'either'
-
     mol = Chem.rdMolInterchange.JSONToMols(json.dumps(json_dict))[0]
     Chem.SanitizeMol(mol)
 
-    if not mol.HasProp('pair_style'):
-        radon_print('pair_style is missing. Assuming lj for pair_style.', level=2)
-        mol.SetProp('pair_style', 'lj')
     for i, a in enumerate(mol.GetAtoms()):
         atom_data = radonpy_ext['atoms'][i]
 
@@ -954,9 +943,6 @@ def JSONToMol_dict(json_dict):
             )
 
 
-    if not mol.HasProp('bond_style'):
-        radon_print('bond_style is missing. Assuming harmonic for bond_style.', level=2)
-        mol.SetProp('bond_style', 'harmonic')
     for i, b in enumerate(mol.GetBonds()):
         bond_data = radonpy_ext['bonds'][i]
 
@@ -969,77 +955,58 @@ def JSONToMol_dict(json_dict):
             b.SetDoubleProp('ff_r0', float(bond_data['ff_r0']))
 
 
-    if not mol.HasProp('angle_style'):
-        radon_print('angle_style is missing. Assuming harmonic for angle_style.', level=2)
-        mol.SetProp('angle_style', 'harmonic')
     if 'angles' in radonpy_ext:
-        if mol.GetProp('angle_style') == 'harmonic':
-            angle_class = ff_class.Angle_harmonic
+        if hasattr(mol, 'angle_style') and mol.angle_style == 'harmonic':
+            angle_class = ff_class.GAFF_Angle
         else:
-            radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
+            angle_class = ff_class.GAFF_Angle
 
-        angle_prop = []
+        angle_prop = {}
         for ang in radonpy_ext['angles']:
             key = '%i,%i,%i' % (int(ang['a']), int(ang['b']), int(ang['c']))
-            angle_prop.append(
-                Angle(
-                    a = int(ang['a']),
-                    b = int(ang['b']),
-                    c = int(ang['c']),
-                    ff = angle_class(**ang['ff'])
-                )
+            angle_prop[key] = Angle(
+                a = int(ang['a']),
+                b = int(ang['b']),
+                c = int(ang['c']),
+                ff = angle_class(**ang['ff'])
             )
         setattr(mol, 'angles', angle_prop)
 
 
-    if not mol.HasProp('dihedral_style'):
-        radon_print('dihedral_style is missing. Assuming fourier for dihedral_style.', level=2)
-        mol.SetProp('dihedral_style', 'fourier')
     if 'dihedrals' in radonpy_ext:
-        if mol.GetProp('dihedral_style') == 'fourier':
-            dihedral_class = ff_class.Dihedral_fourier
-        elif mol.GetProp('dihedral_style') == 'harmonic':
-            dihedral_class = ff_class.Dihedral_harmonic
+        if hasattr(mol, 'dihedral_style') and mol.dihedral_style == 'fourier':
+            dihedral_class = ff_class.GAFF_Dihedral
         else:
-            radon_print('dihedral_style %s is not available.' % mol.GetProp('dihedral_style'), level=3)
+            dihedral_class = ff_class.GAFF_Dihedral
 
-        dihedral_prop = []
+        dihedral_prop = {}
         for dih in radonpy_ext['dihedrals']:
             key = '%i,%i,%i,%i' % (int(dih['a']), int(dih['b']), int(dih['c']), int(dih['d']))
-            dihedral_prop.append(
-                Dihedral(
-                    a = int(dih['a']),
-                    b = int(dih['b']),
-                    c = int(dih['c']),
-                    d = int(dih['d']),
-                    ff = dihedral_class(**dih['ff'])
-                )
+            dihedral_prop[key] = Dihedral(
+                a = int(dih['a']),
+                b = int(dih['b']),
+                c = int(dih['c']),
+                d = int(dih['d']),
+                ff = dihedral_class(**dih['ff'])
             )
         setattr(mol, 'dihedrals', dihedral_prop)
 
 
-    if not mol.HasProp('improper_style'):
-        radon_print('improper_style is missing. Assuming cvff for improper_style.', level=2)
-        mol.SetProp('improper_style', 'cvff')
     if 'impropers' in radonpy_ext:
-        if mol.GetProp('improper_style') == 'cvff':
-            improper_class = ff_class.Improper_cvff
-        elif mol.GetProp('improper_style') == 'umbrella':
-            improper_class = ff_class.Improper_umbrella
+        if hasattr(mol, 'improper_style') and mol.improper_style == 'cvff':
+            improper_class = ff_class.GAFF_Improper
         else:
-            radon_print('improper_style %s is not available.' % mol.GetProp('improper_style'), level=3)
+            improper_class = ff_class.GAFF_Improper
 
-        improper_prop = []
+        improper_prop = {}
         for imp in radonpy_ext['impropers']:
             key = '%i,%i,%i,%i' % (int(imp['a']), int(imp['b']), int(imp['c']), int(imp['d']))
-            improper_prop.append(
-                Improper(
-                    a = int(imp['a']),
-                    b = int(imp['b']),
-                    c = int(imp['c']),
-                    d = int(imp['d']),
-                    ff = improper_class(**imp['ff'])
-                )
+            improper_prop[key] = Improper(
+                a = int(imp['a']),
+                b = int(imp['b']),
+                c = int(imp['c']),
+                d = int(imp['d']),
+                ff = improper_class(**imp['ff'])
             )
         setattr(mol, 'impropers', improper_prop)
 
@@ -1052,85 +1019,13 @@ def JSONToMol_dict(json_dict):
     return mol
 
 
-def picklable(mol):
+def picklable(mol=None):
     Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
     return mol
 
 
-def picklable_old(mol):
-    
-    Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
-    if hasattr(mol, 'angles'):
-        for angle in mol.angles:
-            if type(angle.a) is Chem.Atom:
-                angle.a = angle.a.GetIdx()
-            if type(angle.b) is Chem.Atom:
-                angle.b = angle.b.GetIdx()
-            if type(angle.c) is Chem.Atom:
-                angle.c = angle.c.GetIdx()
-        
-    if hasattr(mol, 'dihedrals'):
-        for dih in mol.dihedrals:
-            if type(dih.a) is Chem.Atom:
-                dih.a = dih.a.GetIdx()
-            if type(dih.b) is Chem.Atom:
-                dih.b = dih.b.GetIdx()
-            if type(dih.c) is Chem.Atom:
-                dih.c = dih.c.GetIdx()
-            if type(dih.d) is Chem.Atom:
-                dih.d = dih.d.GetIdx()
-        
-    if hasattr(mol, 'impropers'):
-        for imp in mol.impropers:
-            if type(imp.a) is Chem.Atom:
-                imp.a = imp.a.GetIdx()
-            if type(imp.b) is Chem.Atom:
-                imp.b = imp.b.GetIdx()
-            if type(imp.c) is Chem.Atom:
-                imp.c = imp.c.GetIdx()
-            if type(imp.d) is Chem.Atom:
-                imp.d = imp.d.GetIdx()
-
-    return mol
-
-
-def restore_picklable(mol):
-    return mol
-
-
-def restore_picklable_old(mol):
-
-    if hasattr(mol, 'angles'):
-        for angle in mol.angles:
-            if type(angle.a) is int:
-                angle.a = mol.GetAtomWithIdx(angle.a)
-            if type(angle.b) is int:
-                angle.b = mol.GetAtomWithIdx(angle.b)
-            if type(angle.c) is int:
-                angle.c = mol.GetAtomWithIdx(angle.c)
-        
-    if hasattr(mol, 'dihedrals'):
-        for dih in mol.dihedrals:
-            if type(dih.a) is int:
-                dih.a = mol.GetAtomWithIdx(dih.a)
-            if type(dih.b) is int:
-                dih.b = mol.GetAtomWithIdx(dih.b)
-            if type(dih.c) is int:
-                dih.c = mol.GetAtomWithIdx(dih.c)
-            if type(dih.d) is int:
-                dih.d = mol.GetAtomWithIdx(dih.d)
-        
-    if hasattr(mol, 'impropers'):
-        for imp in mol.impropers:
-            if type(imp.a) is int:
-                imp.a = mol.GetAtomWithIdx(imp.a)
-            if type(imp.b) is int:
-                imp.b = mol.GetAtomWithIdx(imp.b)
-            if type(imp.c) is int:
-                imp.c = mol.GetAtomWithIdx(imp.c)
-            if type(imp.d) is int:
-                imp.d = mol.GetAtomWithIdx(imp.d)
-
+def restore_picklable(mol=None):
+    # Backward campatibility
     return mol
 
 
@@ -1145,9 +1040,23 @@ def pickle_load(path):
     try:
         with open(path, mode='rb') as f:
             mol = pickle.load(f)
-    except Exception as e:
-        radon_print('Cannot load pickle file %s. %s' % (path, e), level=2)
+    except BaseException as e:
+        radon_print('%s' % e, level=2)
         return None
+
+    # Backward campatibility from version 0.2 to 0.3
+    if hasattr(mol, 'angles'):
+        if type(mol.angles) == list:
+            mol.angles = {'%i,%i,%i' % (ang.a, ang.b, ang.c): ang for ang in mol.angles}
+
+    if hasattr(mol, 'dihedrals'):
+        if type(mol.dihedrals) == list:
+            mol.dihedrals = {'%i,%i,%i,%i' % (dih.a, dih.b, dih.c, dih.d): dih for dih in mol.dihedrals}
+
+    if hasattr(mol, 'impropers'):
+        if type(mol.impropers) == list:
+            mol.impropers = {'%i,%i,%i,%i' % (imp.a, imp.b, imp.c, imp.d): imp for imp in mol.impropers}
+
     return mol
 
 
@@ -1173,11 +1082,18 @@ def tqdm_stub(it, **kwargs):
     return it
 
 
-def mol_from_smiles(smiles, coord=True, version=2, ez='E', chiral='S'):
+def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereochemistry_control=True):
 
-    n_conn = smiles.count('[*]') + smiles.count('*') + smiles.count('[3H]')
     smi = smiles.replace('[*]', '[3H]')
+    smi = re.sub('\[([0-9]+)\*\]', lambda m: '[%iH]' % int(int(m.groups()[0])+2), smi)
     smi = smi.replace('*', '[3H]')
+
+    l = re.findall(r'\[([0-9]+)H\]', smi)
+    labels = [int(x) for x in l if int(x) >= 3]
+    if len(labels) > 0:
+        n_conn = smi.count('[%iH]' % min(labels))
+    else:
+        n_conn = 0
 
     if version == 3:
         etkdg = AllChem.ETKDGv3()
@@ -1187,7 +1103,6 @@ def mol_from_smiles(smiles, coord=True, version=2, ez='E', chiral='S'):
         etkdg = AllChem.ETKDG()
     etkdg.enforceChirality=True
     etkdg.useRandomCoords = False
-    etkdg.maxAttempts = 100
 
     try:
         mol = Chem.MolFromSmiles(smi)
@@ -1196,88 +1111,89 @@ def mol_from_smiles(smiles, coord=True, version=2, ez='E', chiral='S'):
         radon_print('Cannot transform to RDKit Mol object from %s' % smiles, level=3)
         return None
 
-    ### cis/trans and chirality control
-    Chem.AssignStereochemistry(mol)
+    if stereochemistry_control:
+        ### cis/trans and chirality control
+        Chem.AssignStereochemistry(mol)
 
-    # Get polymer backbone
-    backbone_atoms = []
-    backbone_bonds = []
-    backbone_dih = []
+        # Get polymer backbone
+        backbone_atoms = []
+        backbone_bonds = []
+        backbone_dih = []
 
-    if n_conn == 2:
-        link_idx = []
-        for atom in mol.GetAtoms():
-            if atom.GetSymbol() == "H" and atom.GetIsotope() == 3:
-                link_idx.append(atom.GetIdx())
-        backbone_atoms = Chem.GetShortestPath(mol, link_idx[0], link_idx[1])
+        if n_conn == 2:
+            link_idx = []
+            for atom in mol.GetAtoms():
+                if atom.GetSymbol() == "H" and atom.GetIsotope() >= 3:
+                    link_idx.append(atom.GetIdx())
+            backbone_atoms = Chem.GetShortestPath(mol, link_idx[0], link_idx[1])
 
-        for i in range(len(backbone_atoms)-1):
-            bond = mol.GetBondBetweenAtoms(backbone_atoms[i], backbone_atoms[i+1])
-            backbone_bonds.append(bond.GetIdx())
+            for i in range(len(backbone_atoms)-1):
+                bond = mol.GetBondBetweenAtoms(backbone_atoms[i], backbone_atoms[i+1])
+                backbone_bonds.append(bond.GetIdx())
+                if bond.GetBondTypeAsDouble() == 2 and str(bond.GetStereo()) == 'STEREONONE' and not bond.IsInRing():
+                    backbone_dih.append((backbone_atoms[i-1], backbone_atoms[i], backbone_atoms[i+1], backbone_atoms[i+2]))
+
+        # List of unspecified double bonds (except for bonds in polymer backbone and a ring structure)
+        db_list = []
+        for bond in mol.GetBonds():
             if bond.GetBondTypeAsDouble() == 2 and str(bond.GetStereo()) == 'STEREONONE' and not bond.IsInRing():
-                backbone_dih.append((backbone_atoms[i-1], backbone_atoms[i], backbone_atoms[i+1], backbone_atoms[i+2]))
-
-    # List of unspecified double bonds (except for bonds in polymer backbone and a ring structure)
-    db_list = []
-    for bond in mol.GetBonds():
-        if bond.GetBondTypeAsDouble() == 2 and str(bond.GetStereo()) == 'STEREONONE' and not bond.IsInRing():
-            if n_conn == 2 and bond.GetIdx() in backbone_bonds:
-                continue
-            else:
-                db_list.append(bond.GetIdx())
-
-    # Enumerate stereo isomers
-    opts = Chem.EnumerateStereoisomers.StereoEnumerationOptions(unique=True, tryEmbedding=True)
-    isomers = tuple(Chem.EnumerateStereoisomers.EnumerateStereoisomers(mol, options=opts))
-
-    if len(isomers) > 1:
-        radon_print('%i candidates of stereoisomers were generated.' % len(isomers))
-        chiral_num_max = 0
-        
-        for isomer in isomers:
-            ez_flag = False
-            chiral_flag = 0
-
-            Chem.AssignStereochemistry(isomer)
-
-            # Contorol unspecified double bonds (except for bonds in polymer backbone and a ring structure)
-            ez_list = []
-            for idx in db_list:
-                bond = isomer.GetBondWithIdx(idx)
-                if str(bond.GetStereo()) == 'STEREOANY' or str(bond.GetStereo()) == 'STEREONONE':
+                if n_conn == 2 and bond.GetIdx() in backbone_bonds:
                     continue
-                elif ez == 'E' and (str(bond.GetStereo()) == 'STEREOE' or str(bond.GetStereo()) == 'STEREOTRANS'):
-                    ez_list.append(True)
-                elif ez == 'Z' and (str(bond.GetStereo()) == 'STEREOZ' or str(bond.GetStereo()) == 'STEREOCIS'):
-                    ez_list.append(True)
                 else:
-                    ez_list.append(False)
+                    db_list.append(bond.GetIdx())
 
-            if len(ez_list) > 0:
-                ez_flag = np.all(np.array(ez_list))
-            else:
-                ez_flag = True
+        # Enumerate stereo isomers
+        opts = Chem.EnumerateStereoisomers.StereoEnumerationOptions(unique=True, tryEmbedding=True)
+        isomers = tuple(Chem.EnumerateStereoisomers.EnumerateStereoisomers(mol, options=opts))
 
-            # Contorol unspecified chirality
-            chiral_list = np.array(Chem.FindMolChiralCenters(isomer))
-            if len(chiral_list) > 0:
-                chiral_centers = chiral_list[:, 0]
+        if len(isomers) > 1:
+            radon_print('%i candidates of stereoisomers were generated.' % len(isomers))
+            chiral_num_max = 0
+            
+            for isomer in isomers:
+                ez_flag = False
+                chiral_flag = 0
 
-                chirality = chiral_list[:, 1]
-                chiral_num = np.count_nonzero(chirality == chiral)
-                if chiral_num == len(chiral_list):
-                    chiral_num_max = chiral_num
+                Chem.AssignStereochemistry(isomer)
+
+                # Contorol unspecified double bonds (except for bonds in polymer backbone and a ring structure)
+                ez_list = []
+                for idx in db_list:
+                    bond = isomer.GetBondWithIdx(idx)
+                    if str(bond.GetStereo()) == 'STEREOANY' or str(bond.GetStereo()) == 'STEREONONE':
+                        continue
+                    elif ez == 'E' and (str(bond.GetStereo()) == 'STEREOE' or str(bond.GetStereo()) == 'STEREOTRANS'):
+                        ez_list.append(True)
+                    elif ez == 'Z' and (str(bond.GetStereo()) == 'STEREOZ' or str(bond.GetStereo()) == 'STEREOCIS'):
+                        ez_list.append(True)
+                    else:
+                        ez_list.append(False)
+
+                if len(ez_list) > 0:
+                    ez_flag = np.all(np.array(ez_list))
+                else:
+                    ez_flag = True
+
+                # Contorol unspecified chirality
+                chiral_list = np.array(Chem.FindMolChiralCenters(isomer))
+                if len(chiral_list) > 0:
+                    chiral_centers = chiral_list[:, 0]
+
+                    chirality = chiral_list[:, 1]
+                    chiral_num = np.count_nonzero(chirality == chiral)
+                    if chiral_num == len(chiral_list):
+                        chiral_num_max = chiral_num
+                        chiral_flag = 2
+                    elif chiral_num > chiral_num_max:
+                        chiral_num_max = chiral_num
+                        chiral_flag = 1
+                else:
                     chiral_flag = 2
-                elif chiral_num > chiral_num_max:
-                    chiral_num_max = chiral_num
-                    chiral_flag = 1
-            else:
-                chiral_flag = 2
 
-            if ez_flag and chiral_flag:
-                mol = isomer
-                if chiral_flag == 2:
-                    break
+                if ez_flag and chiral_flag:
+                    mol = isomer
+                    if chiral_flag == 2:
+                        break
 
     # Generate 3D coordinates
     if coord:
@@ -1288,21 +1204,26 @@ def mol_from_smiles(smiles, coord=True, version=2, ez='E', chiral='S'):
             return None
         if enbed_res == -1:
             etkdg.useRandomCoords = True
-            enbed_res = AllChem.EmbedMolecule(mol, etkdg)
+            try:
+                enbed_res = AllChem.EmbedMolecule(mol, etkdg)
+            except Exception as e:
+                radon_print('Cannot generate 3D coordinate of %s' % smiles, level=3)
+                return None
             if enbed_res == -1:
                 radon_print('Cannot generate 3D coordinate of %s' % smiles, level=3)
                 return None
 
     # Dihedral angles of unspecified double bonds in a polymer backbone are modified to 180 degree.
-    if len(backbone_dih) > 0:
-        for dih_idx in backbone_dih:
-            Chem.rdMolTransforms.SetDihedralDeg(mol.GetConformer(0), dih_idx[0], dih_idx[1], dih_idx[2], dih_idx[3], 180.0)
+    if stereochemistry_control:
+        if len(backbone_dih) > 0:
+            for dih_idx in backbone_dih:
+                Chem.rdMolTransforms.SetDihedralDeg(mol.GetConformer(0), dih_idx[0], dih_idx[1], dih_idx[2], dih_idx[3], 180.0)
 
-            for na in mol.GetAtomWithIdx(dih_idx[2]).GetNeighbors():
-                na_idx = na.GetIdx()
-                if na_idx != dih_idx[1] and na_idx != dih_idx[3]:
-                    break
-            Chem.rdMolTransforms.SetDihedralDeg(mol.GetConformer(0), dih_idx[0], dih_idx[1], dih_idx[2], na_idx, 0.0)
+                for na in mol.GetAtomWithIdx(dih_idx[2]).GetNeighbors():
+                    na_idx = na.GetIdx()
+                    if na_idx != dih_idx[1] and na_idx != dih_idx[3]:
+                        break
+                Chem.rdMolTransforms.SetDihedralDeg(mol.GetConformer(0), dih_idx[0], dih_idx[1], dih_idx[2], na_idx, 0.0)
 
     return mol
 
@@ -1327,3 +1248,4 @@ def restore_const(c):
     for k, v in c.items():
         setattr(const, k, v)
     return True
+
