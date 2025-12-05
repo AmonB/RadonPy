@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -15,7 +15,7 @@ from ...core import calc, const, utils
 from .. import lammps, preset
 from ..md import MD
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 
 class Equilibration(preset.Preset):
@@ -67,12 +67,16 @@ class Equilibration(preset.Preset):
         f_length = np.cbrt( (mass / const.NA) / (f_density / const.cm2ang**3)) / 2
 
         # Initial relaxation and packing
-        md = MD()
+        md = MD(mol=self.mol)
         md.pair_style = 'lj/cut'
         md.cutoff_in = 3.0
         md.cutoff_out = ''
         md.kspace_style = 'none'
         md.kspace_style_accuracy = ''
+        md.bond_style = self.bond_style
+        md.angle_style = self.angle_style
+        md.dihedral_style = self.dihedral_style
+        md.improper_style = self.improper_style
         md.log_file = kwargs.get('log_file', self.log_file1)
         md.dat_file = kwargs.get('dat_file', self.dat_file1)
         md.dump_file = kwargs.get('dump_file', self.dump_file1)
@@ -94,12 +98,16 @@ class Equilibration(preset.Preset):
     def annealing(self, max_temp=700.0, temp=300.0, press=1.0, step=5000000, set_init_velocity=False, **kwargs):
 
         p_dump = 1000
-        md = MD()
+        md = MD(mol=self.mol)
         md.pair_style = self.pair_style
         md.cutoff_in = self.cutoff_in
         md.cutoff_out = self.cutoff_out
         md.kspace_style = self.kspace_style
         md.kspace_style_accuracy = self.kspace_style_accuracy
+        md.bond_style = self.bond_style
+        md.angle_style = self.angle_style
+        md.dihedral_style = self.dihedral_style
+        md.improper_style = self.improper_style
         md.neighbor = '%s bin' % self.neighbor_dis
         md.log_file = kwargs.get('log_file', self.log_file2)
         md.dat_file = kwargs.get('dat_file', self.dat_file2)
@@ -143,12 +151,16 @@ class Equilibration(preset.Preset):
             press_ratio = [0.02, 0.60, 1.00, 0.50, 0.10, 0.01]
 
         p_dump = 1000
-        md = MD()
+        md = MD(mol=self.mol)
         md.pair_style = self.pair_style
         md.cutoff_in = self.cutoff_in
         md.cutoff_out = self.cutoff_out
         md.kspace_style = self.kspace_style
         md.kspace_style_accuracy = self.kspace_style_accuracy
+        md.bond_style = self.bond_style
+        md.angle_style = self.angle_style
+        md.dihedral_style = self.dihedral_style
+        md.improper_style = self.improper_style
         md.neighbor = '%s bin' % self.neighbor_dis
         md.log_file = kwargs.get('log_file', self.log_file2)
         md.dat_file = kwargs.get('dat_file', self.dat_file2)
@@ -177,12 +189,16 @@ class Equilibration(preset.Preset):
     def sampling(self, temp=300.0, press=1.0, step=5000000, **kwargs):
 
         p_dump = 1000
-        md = MD()
+        md = MD(mol=self.mol)
         md.pair_style = self.pair_style
         md.cutoff_in = self.cutoff_in
         md.cutoff_out = self.cutoff_out
         md.kspace_style = self.kspace_style
         md.kspace_style_accuracy = self.kspace_style_accuracy
+        md.bond_style = self.bond_style
+        md.angle_style = self.angle_style
+        md.dihedral_style = self.dihedral_style
+        md.improper_style = self.improper_style
         md.neighbor = '%s bin' % self.neighbor_dis
         md.log_file = kwargs.get('log_file', self.log_file)
         md.dat_file = kwargs.get('dat_file', self.dat_file)
@@ -204,22 +220,24 @@ class Equilibration(preset.Preset):
         return md
 
 
-    def analyze(self):
+    def analyze(self, ignore_log=[], **kwargs):
 
         analy = Equilibration_analyze(
             log_file  = os.path.join(self.work_dir, self.log_file),
             traj_file = os.path.join(self.work_dir, self.xtc_file),
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
             dat_file  = os.path.join(self.work_dir, self.dat_file),
-            rg_file   = os.path.join(self.work_dir, self.rg_file)
+            rg_file   = os.path.join(self.work_dir, self.rg_file),
+            ignore_log = ignore_log,
+            **kwargs
         )
 
         return analy
 
 
 class Equilibration_analyze(lammps.Analyze):
-    def __init__(self, log_file='eq3.log', **kwargs):
-        super().__init__(log_file=log_file, **kwargs)
+    def __init__(self, log_file='eq3.log', ignore_log=[], **kwargs):
+        super().__init__(log_file=log_file, ignore_log=ignore_log, **kwargs)
         self.totene_sma_sd_crit = kwargs.get('totene_sma_sd_crit', 0.0005)
         self.kinene_sma_sd_crit = kwargs.get('kinene_sma_sd_crit', 0.0005)
         self.ebond_sma_sd_crit = kwargs.get('ebond_sma_sd_crit', 0.001)
@@ -407,7 +425,7 @@ class EQ21step(Equilibration):
 
 
 class Additional(Equilibration):
-    def __init__(self, mol, prefix='', work_dir=None, solver_path=None, idx=0, **kwargs):
+    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, idx=0, **kwargs):
         """
         preset.eq.Additional
 
@@ -496,16 +514,22 @@ def get_final_idx(work_dir):
     last_plist2 = glob.glob(os.path.join(work_dir, '*eq[0-9][0-9]_last.pickle'))
     last_plist3 = glob.glob(os.path.join(work_dir, '*eq[0-9][0-9][0-9]_last.pickle'))
 
-    if len(last_list) > 0:
-        if len(last_list2) > 0:
-            last_list.extend(last_list2)
-        if len(last_list3) > 0:
-            last_list.extend(last_list3)
+    last_jlist  = glob.glob(os.path.join(work_dir, '*eq[0-9]_last.json'))
+    last_jlist2 = glob.glob(os.path.join(work_dir, '*eq[0-9][0-9]_last.json'))
+    last_jlist3 = glob.glob(os.path.join(work_dir, '*eq[0-9][0-9][0-9]_last.json'))
+
+
+    if len(last_jlist) > 0:
+        last_list = last_jlist
+        if len(last_jlist2) > 0:
+            last_list.extend(last_jlist2)
+        if len(last_jlist3) > 0:
+            last_list.extend(last_jlist3)
 
         for file in last_list:
             file = os.path.basename(file)
 
-            m = re.search(r'eq[0-9]+_last\.data$', file)
+            m = re.search(r'eq[0-9]+_last\.json$', file)
             if m is not None:
                 mi = re.search(r'[0-9]+', m.group())
                 i = int(mi.group())
@@ -522,6 +546,21 @@ def get_final_idx(work_dir):
             file = os.path.basename(file)
 
             m = re.search(r'eq[0-9]+_last\.pickle$', file)
+            if m is not None:
+                mi = re.search(r'[0-9]+', m.group())
+                i = int(mi.group())
+                if i > idx: idx = i
+
+    elif len(last_list) > 0:
+        if len(last_list2) > 0:
+            last_list.extend(last_list2)
+        if len(last_list3) > 0:
+            last_list.extend(last_list3)
+
+        for file in last_list:
+            file = os.path.basename(file)
+
+            m = re.search(r'eq[0-9]+_last\.data$', file)
             if m is not None:
                 mi = re.search(r'[0-9]+', m.group())
                 i = int(mi.group())

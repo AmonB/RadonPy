@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -9,10 +9,10 @@
 import os
 import numpy as np
 from rdkit import Geometry as Geom
-from .lammps import LAMMPS, Analyze
+from .md_wrapper import MD_solver, MD_analyzer
 from ..core import calc, utils
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 
 class MD():
@@ -34,7 +34,10 @@ class MD():
         self.rst = kwargs.get('rst', True)
         self.rst_freq = kwargs.get('rst_freq', 10000)
         self.thermo_freq = kwargs.get('thermo_freq', 1000)
-        self.thermo_style = kwargs.get('thermo_style', 'custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz')
+#        self.thermo_style = kwargs.get('thermo_style', 'custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz')
+        self.thermo_style = kwargs.get('thermo_style', ['step', 'time', 'temp', 'press', 'enthalpy', 'etotal', 'ke', 'pe', 'ebond', 'eangle',
+                                                        'edihed', 'eimp', 'evdwl', 'ecoul', 'elong', 'etail', 'vol', 'lx', 'ly', 'lz',
+                                                        'density', 'pxx', 'pyy', 'pzz', 'pxy', 'pxz', 'pyz'])
         self.boundary = kwargs.get('boundary', 'p p p')
         self.pbc = kwargs.get('pbc', True)
         self.units = kwargs.get('units', 'real')
@@ -58,9 +61,31 @@ class MD():
         self.drude = kwargs.get('drude', False)
         self.set_init_velocity = kwargs.get('set_init_velocity', None)
         self.log_append = kwargs.get('log_append', True)
+        self.bc_flag = kwargs.get('bc_flag', False)
         self.wf = []
         self.add = []
         self.add_f = []
+
+        self.mol = None
+
+        if kwargs.get('mol') is not None:
+            mol = kwargs.get('mol')
+            self.mol = mol
+            if mol.HasProp('pair_style'):
+                if mol.GetProp('pair_style') == 'lj':
+                    self.pair_style = 'lj/charmm/coul/long'
+                    self.pair_style_nonpbc = 'lj/charmm/coul/charmm'
+                else:
+                    self.pair_style = mol.GetProp('pair_style')
+                    self.pair_style_nonpbc = mol.GetProp('pair_style')
+            if mol.HasProp('bond_style'):
+                self.bond_style = mol.GetProp('bond_style')
+            if mol.HasProp('angle_style'):
+                self.angle_style = mol.GetProp('angle_style')
+            if mol.HasProp('dihedral_style'):
+                self.dihedral_style = mol.GetProp('dihedral_style')
+            if mol.HasProp('improper_style'):
+                self.improper_style = mol.GetProp('improper_style')
 
 
     def add_min(self, min_style='cg', etol=1.0e-4, ftol=1.0e-6, maxiter=10000, maxeval=100000):
@@ -165,6 +190,14 @@ class Dynamics():
         self.momentum = kwargs.get('momentum', False)
         self.variable = kwargs.get('variable', False)
         self.timeave = kwargs.get('timeave', False)
+        self.thermo_style = kwargs.get('thermo_style', [])
+        self.thermo_freq = kwargs.get('thermo_freq', None)
+        self.rerun = kwargs.get('rerun', False)
+
+# CL modification ********************************************************************************
+        self.bcreate = kwargs.get('bcreate', False)
+        self.bcreate_params = []
+# ******************************************************************
 
         self.add = kwargs.get('add', [])
         self.add_f = kwargs.get('add_f', [])
@@ -178,6 +211,7 @@ class Dynamics():
         self.deform_fin_hi = kwargs.get('deform_fin_hi', 10.0)
         self.deform_axis = axis
         self.deform_remap = kwargs.get('remap', 'v')
+        self.deform_p_couple = kwargs.get('p_couple', False)
         return False
 
 
@@ -249,6 +283,20 @@ class Dynamics():
         return False
 
 
+    def add_rerun(self, dump_file, keyword='dump x y z ix iy iz vx vy vz'):
+
+        self.rerun = True
+
+        self.rerun_dump = dump_file
+        self.rerun_keyword = keyword
+        return False
+        
+
+    def add_bcreate(self, params):
+        self.bcreate = True
+        self.bcreate_params = params
+        return False
+
     def add_user(self, strings):
         self.add.append(strings)
         return False
@@ -282,12 +330,9 @@ def quick_energy(mol, confId=0, force=True, idx=None, tmp_clear=False,
 
     """
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol)
     if not hasattr(mol, 'cell'):
         md.pbc = False
         calc.centering_mol(mol, confId=confId)
@@ -302,7 +347,7 @@ def quick_energy(mol, confId=0, force=True, idx=None, tmp_clear=False,
         utils.radon_print('Error termination of %s. Return code = %i' % (sol.get_name, cp.returncode), level=3)
         return None
 
-    anal = Analyze(os.path.join(sol.work_dir, md.log_file))
+    anal = MD_analyzer(log_file=os.path.join(sol.work_dir, md.log_file))
     energy = anal.dfs[-1]['PotEng'].iat[-1]
 
     if force:
@@ -337,12 +382,9 @@ def quick_min(mol, confId=0, min_style='cg', idx=None, tmp_clear=False,
     """
     mol_copy = utils.deepcopy_mol(mol)
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol_copy)
     if not hasattr(mol_copy, 'cell'):
         md.pbc = False
         calc.centering_mol(mol_copy, confId=confId)
@@ -359,7 +401,7 @@ def quick_min(mol, confId=0, min_style='cg', idx=None, tmp_clear=False,
 
     mol_copy = sol.run(md, mol=mol_copy, confId=confId, last_data=md.write_data, last_str=md.outstr, omp=omp, mpi=mpi, gpu=gpu)
 
-    anal = Analyze(os.path.join(sol.work_dir, md.log_file))
+    anal = MD_analyzer(log_file=os.path.join(sol.work_dir, md.log_file))
     energy = anal.dfs[-1]['PotEng'].iat[-1]
     uwstr, wstr, _, _, _ = sol.read_traj_simple(os.path.join(sol.work_dir, md.outstr))
 
@@ -397,12 +439,9 @@ def quick_min_all(mol, min_style='cg', tmp_clear=False,
     exec_i = np.append(np.arange(mp, mol_copy.GetNumConformers(), mp), mol_copy.GetNumConformers()).tolist()
 
     for i in range(mol_copy.GetNumConformers()):
-        if solver == 'lammps':
-            sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=i)
-        #elif solver == 'gromacs':
-        #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+        sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=i)
 
-        md = MD(idx=i)
+        md = MD(idx=i, mol=mol_copy)
         if not hasattr(mol_copy, 'cell'):
             md.pbc = False
             calc.centering_mol(mol_copy, confId=i)
@@ -447,7 +486,7 @@ def quick_min_all(mol, min_style='cg', tmp_clear=False,
                 if hasattr(mol_copy, 'cell'):
                     mol_copy = calc.mol_trans_in_cell(mol_copy, confId=confId)
 
-                anal = Analyze(os.path.join(sol.work_dir, md.log_file))
+                anal = MD_analyzer(log_file=os.path.join(sol.work_dir, md.log_file))
                 energy = anal.dfs[-1]['PotEng'].iat[-1]
 
                 uwstr_list.append(uwstr)
@@ -482,12 +521,9 @@ def quick_rw(mol, confId=0, step=100, time_step=0.2, temp=700, limit=0.1, shake=
     """
     mol_copy = utils.deepcopy_mol(mol)
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol_copy)
     if not hasattr(mol_copy, 'cell'):
         md.pbc = False
         calc.centering_mol(mol_copy, confId=confId)
@@ -556,12 +592,9 @@ def quick_nve(mol, confId=0, step=2000, time_step=None, limit=0.0, shake=False, 
     """
     mol_copy = utils.deepcopy_mol(mol)
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol_copy)
     if not hasattr(mol_copy, 'cell'):
         md.pbc = False
         calc.centering_mol(mol_copy, confId=confId)
@@ -621,12 +654,9 @@ def quick_nvt(mol, confId=0, step=2000, time_step=None, temp=300.0, f_temp=None,
     """
     mol_copy = utils.deepcopy_mol(mol)
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol_copy)
     if not hasattr(mol_copy, 'cell'):
         md.pbc = False
         calc.centering_mol(mol_copy, confId=confId)
@@ -691,12 +721,9 @@ def quick_npt(mol, confId=0, step=2000, time_step=None, temp=300.0, f_temp=None,
     """
     mol_copy = utils.deepcopy_mol(mol)
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol_copy)
     if not hasattr(mol_copy, 'cell'):
         md.pbc = False
         calc.centering_mol(mol_copy, confId=confId)
@@ -759,12 +786,9 @@ def quick_nph(mol, confId=0, step=2000, time_step=None, press=1.0, f_press=None,
     """
     mol_copy = utils.deepcopy_mol(mol)
 
-    if solver == 'lammps':
-        sol = LAMMPS(work_dir=work_dir, solver_path=solver_path, idx=idx)
-    #elif solver == 'gromacs':
-    #    sol = Gromacs(work_dir=work_dir, solver_path=solver_path)
+    sol = MD_solver(md_solver=solver, work_dir=work_dir, solver_path=solver_path, idx=idx)
 
-    md = MD(idx=idx)
+    md = MD(idx=idx, mol=mol_copy)
     if not hasattr(mol_copy, 'cell'):
         md.pbc = False
         calc.centering_mol(mol_copy, confId=confId)

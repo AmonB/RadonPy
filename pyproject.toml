@@ -20,11 +20,26 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-#dependencies = []
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "psutil",
+    "matplotlib",
+    "rdkit>=2020.03",
+    "mdtraj>=1.9",
+]
 
 [project.optional-dependencies]
 lammps = [
     "lammps>=2020.03.03",
+]
+biopolymers = [
+    "ambertools",
+    "intermol",
+]
+minepy = [
+    "minepy",
 ]
 
 [project.urls]
@@ -38,7 +53,10 @@ platforms = ["Linux", "Mac OS-X", "Unix", "Windows"]
 include = ["radonpy*"]
 
 [tool.setuptools.package-data]
-radonpy = ["ff/ff_dat/*.json"]
+radonpy = [
+    "ff/ff_dat/*.json",
+    "core/pdb/*.pdb"
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "radonpy.__version__"}

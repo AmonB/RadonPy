@@ -1,0 +1,12 @@
+pandas
+numpy
+scipy
+psutil
+matplotlib
+rdkit>=2020.03
+minepy
+mdtraj>=1.9
+lammps>=2020.03.03
+psi4~=1.4,~=1.5,~=1.6,~=1.7,~=1.8,~=1.9,~=1.10
+resp
+dftd3

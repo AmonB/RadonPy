@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -18,7 +18,11 @@ from rdkit import Geometry as Geom
 from ..core import calc, poly, const, utils
 from ..ff import ff_class
 
-__version__ = '0.3.0b3'
+
+# CL Modification **************************************
+import collections
+
+__version__ = '1.0b1'
 
 mdtraj_avail = True
 try:
@@ -43,12 +47,16 @@ class LAMMPS():
             'omp': False,
             'intel': False,
             'opt': False,
-            'gpu': False
+            'gpu': False,
+            'tally': False,
+            'package_list': []
         }
 
         global check_package
         if const.check_package_disable or not check_lammps_package:
             for k in self.package.keys():
+                if k == 'package_list':
+                    continue
                 self.package[k] = True
         elif self.solver_path in check_package.keys():
             self.package = check_package[self.solver_path]
@@ -111,8 +119,7 @@ class LAMMPS():
         else:
             opt_flag = False
 
-        if mpi != 0:
-            mpi = check_mpirun(mpi)
+        mpi = check_mpirun(mpi)
 
         if mpi > 0:
             mpi_cmd = const.mpi_cmd % (mpi)
@@ -199,7 +206,7 @@ class LAMMPS():
                 % (self.get_name, input_file, md.dat_file, cp.returncode), level=3)
             return cp.returncode
 
-        if isinstance(mol, Chem.Mol):
+        if isinstance(mol, Chem.Mol) and last_str is not None:
             uwstr, wstr, cell, vel, _ = self.read_traj_simple(os.path.join(self.work_dir, last_str))
 
             for i in range(mol.GetNumAtoms()):
@@ -220,18 +227,22 @@ class LAMMPS():
         check_intel = False
         check_opt = False
         check_gpu = False
+        check_tally = False
+        package_list = []
 
-        _ = check_mpirun(1)
         try:
-            cmd = '%s -h' % (self.solver_path)
+            cmd = '%s -h' % self.solver_path
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
 
-            flag = False
+            flag = 0
             for l in lines:
+                l = l.replace('\n', '').replace('\r', '')
                 if 'Installed packages:' in l:
-                    flag = True
-                elif flag:
+                    flag = 1
+                elif flag == 1 and l == '':
+                    flag = 2
+                elif flag == 2:
                     if 'OPENMP' in l or 'USER-OMP' in l:
                         utils.radon_print('OPENMP package is available.', level=1)
                         check_omp = True
@@ -244,15 +255,61 @@ class LAMMPS():
                     if 'GPU' in l:
                         utils.radon_print('GPU package is available.', level=1)
                         check_gpu = True
+                    if 'TALLY' in l or 'USER-TALLY' in l:
+                        utils.radon_print('TALLY package is available.', level=1)
+                        check_tally = True
+                    if l == '':
+                        flag = 3
+                        break
+                    package_list.extend(l.split())
 
         except:
-            utils.radon_print('Could not obtain package information of LAMMPS.', level=2)
-            return False
+            try:
+                mpi_cmd = const.mpi_cmd % 1
+                mpi_cmd = mpi_cmd.split()[0]
+
+                cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+                cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
+                lines = str(cp.stdout).splitlines()
+
+                flag = 0
+                for l in lines:
+                    l = l.replace('\n', '').replace('\r', '')
+                    if 'Installed packages:' in l:
+                        flag = 1
+                    elif flag == 1 and l == '':
+                        flag = 2
+                    elif flag == 2:
+                        if 'OPENMP' in l or 'USER-OMP' in l:
+                            utils.radon_print('OPENMP package is available.', level=1)
+                            check_omp = True
+                        if 'INTEL' in l:
+                            utils.radon_print('INTEL package is available.', level=1)
+                            check_intel = True
+                        if 'OPT' in l:
+                            utils.radon_print('OPT package is available.', level=1)
+                            check_opt = True
+                        if 'GPU' in l:
+                            utils.radon_print('GPU package is available.', level=1)
+                            check_gpu = True
+                        if 'TALLY' in l or 'USER-TALLY' in l:
+                            utils.radon_print('TALLY package is available.', level=1)
+                            check_tally = True
+                        if l == '':
+                            flag = 3
+                            break
+                        package_list.extend(l.split())
+
+            except:
+                utils.radon_print('Could not obtain package information of LAMMPS.', level=2)
+                return False
 
         self.package['omp'] = check_omp
         self.package['intel'] = check_intel
         self.package['opt'] = check_opt
         self.package['gpu'] = check_gpu
+        self.package['tally'] = check_tally
+        self.package['package_list'] = package_list
 
         return True
 
@@ -260,22 +317,31 @@ class LAMMPS():
     def get_version(self):
 
         ver = None
-        _ = check_mpirun(1)
         try:
-            cmd = '%s -h' % (self.solver_path)
+            cmd = '%s -h' % self.solver_path
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
-    
+
             for l in lines:
                 if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
                     ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
         except:
-            return ver
+            try:
+                mpi_cmd = const.mpi_cmd % 1
+                cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+                cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
+                lines = str(cp.stdout).splitlines()
+
+                for l in lines:
+                    if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
+                        ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
+            except:
+                return ver
 
         return ver
         
 
-    def make_dat(self, mol, confId=0, file_name=None, dir_name=None, velocity=True, temp=300, drude=False):
+    def make_dat(self, mol, confId=0, file_name=None, dir_name=None, velocity=True, temp=300, drude=False, cl_param_list=[]):
         """
         LAMMPS.make_dat
 
@@ -299,11 +365,12 @@ class LAMMPS():
         file_name = file_name if file_name is not None else self.dat_file
         dir_name = dir_name if dir_name is not None else self.work_dir
         dat_file = os.path.join(dir_name, file_name)
-        MolToLAMMPSdata(mol, dat_file, confId=confId, velocity=velocity, temp=temp, drude=drude)
+        MolToLAMMPSdata(mol, dat_file, confId=confId, velocity=velocity, temp=temp, drude=drude, cl_param_list=cl_param_list)
 
         return dat_file
 
 
+# CL modification **************************************************
     def make_input(self, md, file_name=None, dir_name=None):
         """
         LAMMPS.make_input
@@ -320,6 +387,11 @@ class LAMMPS():
         Return:
             Strings of content in input files
         """
+
+        for wf in md.wf:
+            if hasattr(wf, 'bcreate') and wf.bcreate:
+                md.bc_flag = True
+                bc_params = wf.bcreate_params
 
         indata = []
         if md.log_append:
@@ -349,9 +421,42 @@ class LAMMPS():
         indata.append('pair_modify %s' % (md.pair_modify))
         indata.append('neighbor %s' % (md.neighbor))
         indata.append('neigh_modify %s' % (md.neigh_modify))
-        indata.append('read_data %s' % (md.dat_file))
+
+        cmap_read_data = ''
+        if md.mol is not None and hasattr(md.mol, 'cmaps'):
+            indata.append('fix cmap0 all cmap cmap.data')
+            cmap_read_data = ' fix cmap0 crossterm CMAP'
+            
+# CL Modification (read_data) **************************************
+        if md.bc_flag:
+            tmp_list = []
+            for param in bc_params:
+                tmp_list.append(param['iatom'])
+                tmp_list.append(param['jatom'])
+
+            c = collections.Counter(tmp_list)
+            max_react = max(c.values())
+
+            indata.append('read_data %s extra/special/per/atom %i extra/bond/per/atom %i extra/angle/per/atom %i%s' % (md.dat_file, 25*max_react, max_react, 10*max_react, cmap_read_data))
+        
+        else:
+            indata.append('read_data %s%s' % (md.dat_file, cmap_read_data))
+# ******************************************************************
+
         indata.append('')
-        indata.append('thermo_style %s' % (md.thermo_style))
+
+        all_nowater = 'all'
+        tip_types = self.get_tip_types(md.mol)
+        if len(tip_types) > 0:
+            tip_types = [str(i) for i in tip_types]
+            indata.append('group water0 type ' + " ".join(tip_types))
+            indata.append('group nowater0 subtract all water0')
+            indata.append('fix rigid1 water0 rigid/small molecule')
+            indata.append('neigh_modify exclude molecule/intra water0')
+            all_nowater = 'nowater0'
+
+        indata.append('')
+        indata.append('thermo_style custom %s' % ' '.join(md.thermo_style))
         indata.append('thermo_modify flush yes')
         indata.append('thermo %i' % (md.thermo_freq))
 
@@ -388,9 +493,15 @@ class LAMMPS():
                 if md.xtc_file:
                     indata.append('undump xtc0')
 
+                if len(tip_types) > 0:
+                    indata.append('fix freeze water0 setforce 0.0 0.0 0.0')
+                    
                 indata.append('min_style %s' % (wf.min_style))
                 indata.append('minimize %f %f %i %i' % (wf.etol, wf.ftol, wf.maxiter, wf.maxeval))
                 indata.append('reset_timestep 0')
+
+                if len(tip_types) > 0:
+                    indata.append('unfix freeze')
                 
                 if md.dump_file:
                     indata.append('dump dump0 all custom %i %s %s' % (md.dump_freq, md.dump_file, md.dump_style))
@@ -413,6 +524,14 @@ class LAMMPS():
                 if wf.chunk_mol:
                     indata.append('compute cmol%i all chunk/atom molecule nchunk once limit 0 ids once compress no' % (i+1))
                     unfix.append('uncompute cmol%i' % (i+1))
+
+# CL modification **************************************************
+                # Generate "fix bond/create"
+                if wf.bcreate:
+                    indata.append('')
+                    indata.append('# bond/create')
+                    self.make_input_bcreate(md, wf, i, indata, unfix)
+# ******************************************************************
 
                 # Generate "fix efield"
                 if wf.efield:
@@ -456,7 +575,7 @@ class LAMMPS():
 
                 # Generate SHAKE constraint
                 if wf.shake:
-                    indata.append('fix shake%i all shake 1e-4 1000 0 m 1.0' % (i+1))
+                    indata.append('fix shake%i %s shake 1e-4 1000 0 m 1.0' % (i+1, all_nowater))
                     unfix.append('unfix shake%i' % (i+1))
 
                 # Generate "fix deform"
@@ -490,34 +609,35 @@ class LAMMPS():
                     indata.append('')
                     indata.append('# nve')
                     if wf.nve_limit == 0:
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                     else:
-                        indata.append('fix md%i all nve/limit %f' % (i+1, wf.nve_limit))
+                        indata.append('fix md%i %s nve/limit %f' % (i+1, all_nowater, wf.nve_limit))
 
                 elif wf.ensemble == 'nvt':
                     indata.append('')
                     indata.append('# nvt')
                     if wf.thermostat == 'Nose-Hoover':
-                        indata.append('fix md%i all nvt temp %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
+                        indata.append('fix md%i %s nvt temp %f %f %f' % (i+1, all_nowater, wf.t_start, wf.t_stop, wf.t_dump))
 
                     elif wf.thermostat == 'Langevin':
                         indata.append('fix thermostat%i all langevin %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'Berendsen':
                         indata.append('fix thermostat%i all temp/berendsen %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'csvr':
                         indata.append('fix thermostat%i all temp/csvr %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
                         indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'csld':
                         indata.append('fix thermostat%i all temp/csld %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     else:
@@ -528,59 +648,59 @@ class LAMMPS():
                     indata.append('')
                     indata.append('# npt')
                     if wf.thermostat == 'Nose-Hoover' and wf.barostat == 'Nose-Hoover':
-                        indata.append('fix md%i all npt temp %f %f %f %s' %
-                                    (i+1, wf.t_start, wf.t_stop, wf.t_dump, p_str))
+                        indata.append('fix md%i %s npt temp %f %f %f %s' %
+                                    (i+1, all_nowater, wf.t_start, wf.t_stop, wf.t_dump, p_str))
 
                     elif wf.thermostat == 'Langevin' and wf.barostat == 'Nose-Hoover':
                         indata.append('fix thermostat%i all langevin %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i all nph %s' % (i+1, p_str))
+                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'Berendsen' and wf.barostat == 'Nose-Hoover':
                         indata.append('fix thermostat%i all temp/berendsen %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
-                        indata.append('fix md%i all nph %s' % (i+1, p_str))
+                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'csvr' and wf.barostat == 'Nose-Hoover':
                         indata.append('fix thermostat%i all temp/csvr %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i all nph %s' % (i+1, p_str))
+                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'csld' and wf.barostat == 'Nose-Hoover':
                         indata.append('fix thermostat%i all temp/csld %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i all nph %s' % (i+1, p_str))
+                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
                         unfix.append('unfix thermostat%i' % (i+1))
 
                     elif wf.thermostat == 'Nose-Hoover' and wf.barostat == 'Berendsen':
                         indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i all nvt temp %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
+                        indata.append('fix md%i %s nvt temp %f %f %f' % (i+1, all_nowater, wf.t_start, wf.t_stop, wf.t_dump))
                         unfix.append('unfix barostat%i' % (i+1))
 
                     elif wf.thermostat == 'Langevin' and wf.barostat == 'Berendsen':
                         indata.append('fix thermostat%i all langevin %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
                         indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
                         unfix.append('unfix barostat%i' % (i+1))
 
                     elif wf.thermostat == 'Berendsen' and wf.barostat == 'Berendsen':
                         indata.append('fix thermostat%i all temp/berendsen %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
                         indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
                         unfix.append('unfix barostat%i' % (i+1))
 
                     elif wf.thermostat == 'csvr' and wf.barostat == 'Berendsen':
                         indata.append('fix thermostat%i all temp/csvr %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
                         indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
                         unfix.append('unfix barostat%i' % (i+1))
 
                     elif wf.thermostat == 'csld' and wf.barostat == 'Berendsen':
                         indata.append('fix thermostat%i all temp/csld %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
                         indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix thermostat%i' % (i+1))
                         unfix.append('unfix barostat%i' % (i+1))
 
@@ -592,11 +712,11 @@ class LAMMPS():
                     indata.append('')
                     indata.append('# nph')
                     if wf.barostat == 'Nose-Hoover':
-                        indata.append('fix md%i all nph %s' % (i+1, p_str))
+                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
 
                     elif wf.barostat == 'Berendsen':
-                        indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i all nve' % (i+1))
+                        indata.append('fix barostat%i %s press/berendsen %s' % (i+1, all_nowater, p_str))
+                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
                         unfix.append('unfix barostat%i' % (i+1))
 
                     else:
@@ -612,21 +732,33 @@ class LAMMPS():
                     indata.append('fix momentum%i all momentum 1000 linear 1 1 1 rescale' % (i+1))
                     unfix.append('unfix momentum%i' % (i+1))
 
+                # Update thermo_style
+                indata.append('')
+                indata.append('# Update thermo_style')
+                self.update_thermo_style(md, wf, i, indata, unfix)
 
                 indata.append('')
-                indata.append('run %i' % (wf.step))
+                if wf.rerun:
+                    indata.append('rerun %s %s' % (wf.rerun_dump, wf.rerun_keyword))
+                else:
+                    indata.append('run %i' % (wf.step))
                 indata.append('unfix md%i' % (i+1))
                 indata.extend(unfix)
                 if len(wf.add_f) > 0:
                     indata.extend(wf.add_f)
 
         if len(md.wf) == 0:
-            indata.append('fix md0 all nve')
+            indata.append('fix md0 %s nve' % all_nowater)
             indata.append('run 0')
 
         indata.append('')
         indata.append('write_dump all custom %s id x y z xu yu zu vx vy vz fx fy fz modify sort id' % (md.outstr))
         if md.write_data:
+# CL modification **************************************************
+            indata.append('')
+            indata.append('thermo_style custom %s' % ' '.join(md.thermo_style))
+            indata.append('thermo_modify flush yes')
+# ******************************************************************
             indata.append('write_data %s' % (md.write_data))
 
         if len(md.add_f) > 0:
@@ -647,6 +779,15 @@ class LAMMPS():
                 os.fsync(fh.fileno())
 
         return in_file
+
+
+    def update_thermo_style(self, md, wf, i, indata, unfix):
+        indata.append('thermo_style custom %s' % ' '.join([*md.thermo_style, *wf.thermo_style]))
+        indata.append('thermo_modify flush yes')
+        if wf.thermo_freq is not None:
+            indata.append('thermo %i' % (wf.thermo_freq))
+        else:
+            indata.append('thermo %i' % (md.thermo_freq))
 
 
     def make_input_drude(self, md, indata):
@@ -671,15 +812,18 @@ class LAMMPS():
                     if wf.deform_axis == 'x':
                         wf.py_start, wf.py_stop, wf.py_dump = wf.p_start, wf.p_stop, wf.p_dump
                         wf.pz_start, wf.pz_stop, wf.pz_dump = wf.p_start, wf.p_stop, wf.p_dump
-                        wf.p_couple = 'yz'
+                        if wf.deform_p_couple:
+                            wf.p_couple = 'yz'
                     elif wf.deform_axis == 'y':
                         wf.px_start, wf.px_stop, wf.px_dump = wf.p_start, wf.p_stop, wf.p_dump
                         wf.pz_start, wf.pz_stop, wf.pz_dump = wf.p_start, wf.p_stop, wf.p_dump
-                        wf.p_couple = 'xz'
+                        if wf.deform_p_couple:
+                            wf.p_couple = 'xz'
                     elif wf.deform_axis == 'z':
                         wf.px_start, wf.px_stop, wf.px_dump = wf.p_start, wf.p_stop, wf.p_dump
                         wf.py_start, wf.py_stop, wf.py_dump = wf.p_start, wf.p_stop, wf.p_dump
-                        wf.p_couple = 'xy'
+                        if wf.deform_p_couple:
+                            wf.p_couple = 'xy'
                     elif wf.deform_axis == 'xy':
                         wf.pz_start, wf.pz_stop, wf.pz_dump = wf.p_start, wf.p_stop, wf.p_dump
                     elif wf.deform_axis == 'xz':
@@ -725,15 +869,18 @@ class LAMMPS():
                     if wf.deform_axis == 'x':
                         wf.py_start, wf.py_stop, wf.py_dump = wf.p_start, wf.p_stop, wf.p_dump
                         wf.pz_start, wf.pz_stop, wf.pz_dump = wf.p_start, wf.p_stop, wf.p_dump
-                        wf.p_couple = 'yz'
+                        if wf.deform_p_couple:
+                            wf.p_couple = 'yz'
                     elif wf.deform_axis == 'y':
                         wf.px_start, wf.px_stop, wf.px_dump = wf.p_start, wf.p_stop, wf.p_dump
                         wf.pz_start, wf.pz_stop, wf.pz_dump = wf.p_start, wf.p_stop, wf.p_dump
-                        wf.p_couple = 'xz'
+                        if wf.deform_p_couple:
+                            wf.p_couple = 'xz'
                     elif wf.deform_axis == 'z':
                         wf.px_start, wf.px_stop, wf.px_dump = wf.p_start, wf.p_stop, wf.p_dump
                         wf.py_start, wf.py_stop, wf.py_dump = wf.p_start, wf.p_stop, wf.p_dump
-                        wf.p_couple = 'xy'
+                        if wf.deform_p_couple:
+                            wf.p_couple = 'xy'
                     elif wf.deform_axis == 'xy':
                         wf.pz_start, wf.pz_stop, wf.pz_dump = wf.p_start, wf.p_stop, wf.p_dump
                     elif wf.deform_axis == 'xz':
@@ -793,10 +940,7 @@ class LAMMPS():
         if not nounfix:
             unfix.append('unfix EF%i' % (i+1))
 
-        md.thermo_style += ' v_efac'
-        indata.append('thermo_style %s' % (md.thermo_style))
-        indata.append('thermo_modify flush yes')
-        indata.append('thermo %i' % (md.thermo_freq))
+        wf.thermo_style += ['v_efac']
 
         return indata, unfix
 
@@ -810,10 +954,7 @@ class LAMMPS():
 
         unfix.append('uncompute dipole%i' % (i+1))
 
-        md.thermo_style += ' v_mux v_muy v_muz v_mu'
-        indata.append('thermo_style %s' % (md.thermo_style))
-        indata.append('thermo_modify flush yes')
-        indata.append('thermo %i' % (md.thermo_freq))
+        wf.thermo_style += ['v_mux', 'v_muy', 'v_muz', 'v_mu']
 
         return indata, unfix
 
@@ -840,10 +981,7 @@ class LAMMPS():
         unfix.append('unfix msd%i' % (i+1))
         unfix.append('uncompute msd%i' % (i+1))
 
-        md.thermo_style += ' v_msd'
-        indata.append('thermo_style %s' % (md.thermo_style))
-        indata.append('thermo_modify flush yes')
-        indata.append('thermo %i' % (md.thermo_freq))
+        wf.thermo_style += ['v_msd']
 
         return indata, unfix
 
@@ -865,11 +1003,7 @@ class LAMMPS():
         var_str = ' '.join(wf.timeave_var)
         indata.append('fix %s all ave/time %i %i %i %s' % (wf.timeave_name, wf.timeave_nevery, wf.timeave_nfreq, wf.timeave_nstep, var_str))
 
-        fix_name = ' '.join(['f_%s[%i]' % (wf.timeave_name, (j+1)) for j in range(len(wf.timeave_var))])
-        md.thermo_style += ' %s' % fix_name
-        indata.append('thermo_style %s' % (md.thermo_style))
-        indata.append('thermo_modify flush yes')
-        indata.append('thermo %i' % (md.thermo_freq))
+        wf.thermo_style += ['f_%s[%i]' % (wf.timeave_name, (j+1)) for j in range(len(wf.timeave_var))]
 
         return indata, unfix
 
@@ -877,6 +1011,41 @@ class LAMMPS():
     def make_input_atomave(self, md, wf, i, indata, unfix, nounfix=False):
         # Under development
         return indata, unfix
+
+
+# CL modification **************************************************
+    def make_input_bcreate(self, md, wf, i, indata, unfix):
+        for j, param in enumerate(wf.bcreate_params):
+            if 'aconstrain_min' in param and 'aconstrain_max' in param:
+                fix_command = 'bond/create/angle'
+            else:
+                fix_command = 'bond/create'
+
+            fix_bcreate_temp = 'fix bcreate%i_%i all %s %i %i %i %f %i' % (
+                (i+1), j, fix_command, param['Nevery'], param['iatom'], param['jatom'], param['Rmin'], param['bondtype'])
+
+            if 'iparam_maxbond' in param and 'iparam_atomtype' in param:
+                fix_bcreate_temp += ' iparam %i %i' % (param['iparam_maxbond'], param['iparam_atomtype'])
+            if 'jparam_maxbond' in param and 'jparam_atomtype' in param:
+                fix_bcreate_temp += ' jparam %i %i' % (param['jparam_maxbond'], param['jparam_atomtype'])
+            if 'prob' in param:
+                fix_bcreate_temp += ' prob %f %i' % (param['prob'], param['seed'])
+            if 'angletype' in param:
+                fix_bcreate_temp += ' atype %i' % (param['angletype'])
+            if 'dihedtype' in param:
+                fix_bcreate_temp += ' dtype %i' % (param['dihedtype'])
+            if 'improtype' in param:
+                fix_bcreate_temp += ' itype %i' % (param['improtype'])
+            if 'aconstrain_min' in param and 'aconstrain_max' in param:
+                fix_bcreate_temp += ' aconstrain %i %i' % (param['aconstrain_min'], param['aconstrain_max'])
+            indata.append(fix_bcreate_temp)
+
+            unfix.append('unfix bcreate%i_%i' % ((i+1), j))
+
+            wf.thermo_style += ['f_bcreate%i_%i[1]' % ((i+1), j), 'f_bcreate%i_%i[2]' % ((i+1), j)]
+
+        return indata, unfix, i
+# ******************************************************************
 
 
     def read_traj_last(self, filename, b_size=64):
@@ -1059,6 +1228,23 @@ class LAMMPS():
 
         return uwstr, wstr, np.array(cell), v, f
 
+    def get_tip_types(self, mol):
+
+        if mol is None:
+            return []
+        
+        tip_types = []
+        for atom in mol.GetAtoms():
+            if (atom.GetProp('ff_type') == "OTIP" or
+                atom.GetProp('ff_type') == "HTIP" or
+                atom.GetProp('ff_type') == "MTIP" or
+                atom.GetProp('ff_type') == "LTIP"):
+                tip_types.append(atom.GetProp('ff_type_num'))
+        tip_types = sorted(list(set(tip_types)))
+
+        return tip_types
+
+
 def check_mpirun(mpi):
     """Check if mpirun is available
  
@@ -1089,8 +1275,8 @@ def check_mpirun(mpi):
 ###########################################
 
 class Analyze():
-    def __init__(self, log_file='radon_md.log', **kwargs):
-        self.dfs = self.read_log(log_file)
+    def __init__(self, log_file='radon_md.log', ignore_log=[], **kwargs):
+        self.dfs = self.read_log(log_file, ignore_log=ignore_log)
         self.log_file = log_file
         self.in_file = kwargs.get('in_file', 'radon_md.dump')
         self.dat_file = kwargs.get('dat_file', 'radon_md_lmp.data')
@@ -1145,7 +1331,7 @@ class Analyze():
         self.volexp_sma_sd_crit = kwargs.get('volexp_sma_sd_crit', None)
 
 
-    def read_log(self, log_file):
+    def read_log(self, log_file, ignore_log=[]):
         """
         lammps.Analyze.read_log
 
@@ -1162,7 +1348,7 @@ class Analyze():
             log_data = [s.replace('\n', '').replace('\r', '') for s in fh.readlines()]
 
         try:
-            dfs = self.parse_thermo(log_data)
+            dfs = self.parse_thermo(log_data, ignore_log=ignore_log)
             self.dfs = dfs
         except Exception as e:
             self.dfs = dfs = None
@@ -1172,7 +1358,7 @@ class Analyze():
 
 
     @classmethod
-    def parse_thermo(cls, log_data):
+    def parse_thermo(cls, log_data, ignore_log=[]):
         """
         lammps.Analyze.parse_thermo
 
@@ -1190,6 +1376,9 @@ class Analyze():
         data = []
         dfs = []
 
+        if ignore_log is None or len(ignore_log) == 0:
+            ignore_log = ['WARNING: Too many warnings:']
+
         for line in log_data:
             if line.find('Per MPI rank memory allocation') == 0 or line.find('Memory usage per processor') == 0:
                 d_flag = 1
@@ -1206,6 +1395,13 @@ class Analyze():
                 data = []
             elif d_flag == 2:
                 try:
+                    ignore_flag = False
+                    for ignore_line in ignore_log:
+                        if ignore_line in line:
+                            ignore_flag = True
+                            break
+                    if ignore_flag:
+                        continue
                     data.append([float(f) for f in line.split()])
                 except ValueError as e:
                     utils.radon_print('Can not parse thermodynamic data. %s; Skip to parse the data of %i step.' % (e, len(dfs)), level=1)
@@ -2561,9 +2757,10 @@ class Analyze():
 # IO functions
 ###########################################
 
-def MolToLAMMPSdata(mol, file_name, confId=0, velocity=True, temp=300, drude=False):
+# CL modification ********************************************************************************
+def MolToLAMMPSdata(mol, file_name, confId=0, velocity=True, temp=300, drude=False, cl_param_list=[]):
 
-    block = MolToLAMMPSdataBlock(mol, confId=confId, velocity=velocity, temp=temp, drude=drude)
+    block, cmap_block = MolToLAMMPSdataBlock(mol, confId=confId, velocity=velocity, temp=temp, drude=drude, cl_param_list=cl_param_list)
     if block is None: return False
 
     with open(file_name, 'w') as fh:
@@ -2574,84 +2771,218 @@ def MolToLAMMPSdata(mol, file_name, confId=0, velocity=True, temp=300, drude=Fal
         else:
             os.fsync(fh.fileno())
 
+    if len(cmap_block) > 0:
+        dir_name = os.path.dirname(file_name)
+        cmap_file = os.path.join(dir_name, 'cmap.data')
+        with open(cmap_file, 'w') as fh:
+            fh.write('\n'.join(cmap_block)+'\n')
+            fh.flush()
+            if hasattr(os, 'fdatasync'):
+                os.fdatasync(fh.fileno())
+            else:
+                os.fsync(fh.fileno())
+
     return True
 
 
-def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
+# CL modification ********************************************************************************
+def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl_param_list=[]):
 
     unique_ptype = []
     p_mass = []
     p_coeff = []
-    i = 0
+# CL modification ********************************************************************************
+    CL_react_atomtype_dict = {}
+    CL_remove_atomtype_dict = {}
+    CL_new_atomtype_dict = {}
+    CL_new_bondtype_dict = {}
+
+    ip = 0
+    if not mol.HasProp('pair_style'):
+        utils.radon_print('pair_style is missing in MolToLAMMPSdataBlock. Assuming lj for pair_style.', level=2)
+        mol.SetProp('pair_style', 'lj')
     for atom in mol.GetAtoms():
         if atom.GetSymbol() == 'H' and atom.GetIsotope() >= 3:
-            ptype = '%s,0' % atom.GetProp('ff_type')
+            if atom.HasProp('CL_remove') and atom.GetBoolProp('CL_remove'):
+                ptype = '%s,0,cl_remove' % atom.GetProp('ff_type')
+            else:
+                ptype = '%s,0' % atom.GetProp('ff_type')
         else:
-            ptype = '%s,%i' % (atom.GetProp('ff_type'), atom.GetIsotope())
+            if atom.HasProp('CL_react') and atom.GetBoolProp('CL_react'):
+                ptype = '%s,%i,cl_react' % (atom.GetProp('ff_type'), atom.GetIsotope())
+            else:
+                ptype = '%s,%i' % (atom.GetProp('ff_type'), atom.GetIsotope())
             
         if ptype in unique_ptype:
             atom.SetIntProp('ff_type_num', unique_ptype.index(ptype)+1)
         else:
-            i += 1
+            ip += 1
             unique_ptype.append(ptype)
-            p_mass.append(atom.GetMass())
-            p_coeff.append([atom.GetDoubleProp('ff_epsilon'), atom.GetDoubleProp('ff_sigma')])
-            atom.SetIntProp('ff_type_num', i)
+            if atom.GetSymbol() == 'H' and atom.GetIsotope() >= 3:
+                p_mass.append(1.008)
+            elif (atom.GetProp('ff_type') == 'MTIP' or
+                  atom.GetProp('ff_type') == 'LTIP'):
+                p_mass.append(1.0e-100)
+            else:
+                p_mass.append(atom.GetMass())
+            if mol.GetProp('pair_style') == 'lj':
+                p_coeff.append([atom.GetDoubleProp('ff_epsilon'), atom.GetDoubleProp('ff_sigma')])
+            else:
+                utils.radon_print('pair_style %s is not available.' % mol.GetProp('pair_style'), level=3)
+            atom.SetIntProp('ff_type_num', ip)
+
+            if atom.HasProp('CL_react') and atom.GetBoolProp('CL_react'):
+                for na in atom.GetNeighbors():
+                    if na.GetSymbol() == 'H' and na.GetIsotope() >= 3:
+                        label = na.GetIsotope() - 2
+                        CL_react_atomtype_dict[label] = ip
+
+            if atom.HasProp('CL_remove') and atom.GetBoolProp('CL_remove'):
+                label = atom.GetIsotope() - 2
+                CL_remove_atomtype_dict[label] = ip
+    #####################################################################################################
 
     unique_btype = []
     b_coeff = []
-    i = 0
+    ib = 0
+    if not mol.HasProp('bond_style'):
+        utils.radon_print('bond_style is missing in MolToLAMMPSdataBlock. Assuming harmonic for bond_style.', level=2)
+        mol.SetProp('bond_style', 'harmonic')
     for bond in mol.GetBonds():
         btype = bond.GetProp('ff_type')
         if btype in unique_btype:
             bond.SetIntProp('ff_type_num', unique_btype.index(btype)+1)
         else:
-            i += 1
+            ib += 1
             unique_btype.append(btype)
-            b_coeff.append([bond.GetDoubleProp('ff_k'), bond.GetDoubleProp('ff_r0')])
-            bond.SetIntProp('ff_type_num', i)
+            if mol.GetProp('bond_style') == 'harmonic':
+                b_coeff.append([bond.GetDoubleProp('ff_k'), bond.GetDoubleProp('ff_r0')])
+            else:
+                utils.radon_print('bond_style %s is not available.' % mol.GetProp('bond_style'), level=3)
+            bond.SetIntProp('ff_type_num', ib)
 
     unique_atype = []
     a_coeff = []
-    i = 0
+    ia = 0
+    if not mol.HasProp('angle_style'):
+        utils.radon_print('angle_style is missing in MolToLAMMPSdataBlock. Assuming harmonic for angle_style.', level=2)
+        mol.SetProp('angle_style', 'harmonic')
     if hasattr(mol, 'angles'):
         for angle in mol.angles.values():
             if angle.ff.type in unique_atype:
                 angle.ff.type_num = unique_atype.index(angle.ff.type)+1
             else:
-                i += 1
+                ia += 1
                 unique_atype.append(angle.ff.type)
-                a_coeff.append([angle.ff.k, angle.ff.theta0])
-                angle.ff.type_num = i
+                if mol.GetProp('angle_style') == 'harmonic':
+                    a_coeff.append([angle.ff.k, angle.ff.theta0])
+                else:
+                    utils.radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
+                angle.ff.type_num = ia
 
     unique_dtype = []
     d_coeff = []
-    i = 0
+    i_d = 0
+    if not mol.HasProp('dihedral_style'):
+        utils.radon_print('dihedral_style is missing in MolToLAMMPSdataBlock. Assuming fourier for dihedral_style.', level=2)
+        mol.SetProp('dihedral_style', 'fourier')
     if hasattr(mol, 'dihedrals'):
         for dihedral in mol.dihedrals.values():
             if dihedral.ff.type in unique_dtype:
                 dihedral.ff.type_num = unique_dtype.index(dihedral.ff.type)+1
             else:
-                i += 1
+                i_d += 1
                 unique_dtype.append(dihedral.ff.type)
-                coeff = [dihedral.ff.m]
-                for j in range(len(dihedral.ff.k)):
-                    coeff.extend([dihedral.ff.k[j], dihedral.ff.n[j], dihedral.ff.d0[j]])
-                d_coeff.append(coeff)
-                dihedral.ff.type_num = i
+                if mol.GetProp('dihedral_style') == 'fourier':
+                    coeff = [dihedral.ff.m]
+                    for j in range(len(dihedral.ff.k)):
+                        coeff.extend([dihedral.ff.k[j], dihedral.ff.n[j], dihedral.ff.d0[j]])
+                    d_coeff.append(coeff)
+                elif mol.GetProp('dihedral_style') == 'harmonic':
+                    d_coeff.append([dihedral.ff.k, dihedral.ff.d0, dihedral.ff.n])
+                elif mol.GetProp('dihedral_style') == 'charmm':
+                    d_coeff.append([dihedral.ff.k, dihedral.ff.d0, dihedral.ff.n, dihedral.ff.w])
+                else:
+                    utils.radon_print('dihedral_style %s is not available.' % mol.GetProp('dihedral_style'), level=3)
+                dihedral.ff.type_num = i_d
 
     unique_itype = []
     i_coeff = []
-    i = 0
+    ii = 0
+    if not mol.HasProp('improper_style'):
+        utils.radon_print('improper_style is missing in MolToLAMMPSdataBlock. Assuming cvff for improper_style.', level=2)
+        mol.SetProp('improper_style', 'cvff')
     if hasattr(mol, 'impropers'):
         for improper in mol.impropers.values():
             if improper.ff.type in unique_itype:
                 improper.ff.type_num = unique_itype.index(improper.ff.type)+1
             else:
-                i += 1
+                ii += 1
                 unique_itype.append(improper.ff.type)
-                i_coeff.append([improper.ff.k, improper.ff.d0, improper.ff.n])
-                improper.ff.type_num = i
+                if mol.GetProp('improper_style') == 'cvff':
+                    i_coeff.append([improper.ff.k, improper.ff.d0, improper.ff.n])
+                elif mol.GetProp('improper_style') == 'umbrella':
+                    i_coeff.append([improper.ff.k, improper.ff.x0])
+                else:
+                    utils.radon_print('improper_style %s is not available.' % mol.GetProp('improper_style'), level=3)
+                improper.ff.type_num = ii
+
+    unique_ctype = []
+    c_coeff = []
+    ic = 0
+    if hasattr(mol, 'cmaps'):
+        for cmap in mol.cmaps.values():
+            if cmap.ff.type in unique_ctype:
+                cmap.ff.type_num = unique_ctype.index(cmap.ff.type) + 1
+            else:
+                ic += 1
+                unique_ctype.append(cmap.ff.type)
+                c_coeff.append(cmap.ff.prm)
+                cmap.ff.type_num = ic
+
+                
+# CL modification ********************************************************************************
+    for i, cl_params in enumerate(cl_param_list):
+        # Set atom type number
+        cl_param_list[i]['iatom'] = CL_react_atomtype_dict[cl_params['label1']]
+        cl_param_list[i]['jatom'] = CL_react_atomtype_dict[cl_params['label2']]
+        cl_param_list[i]['iatom_remove'] = CL_remove_atomtype_dict[cl_params['label1']]
+        cl_param_list[i]['jatom_remove'] = CL_remove_atomtype_dict[cl_params['label2']]
+
+        # Add new atom type after bond create
+        unique_ptype.append('%s,cl_new_atom' % (cl_params['iparam_fftype']))
+        unique_ptype.append('%s,cl_new_atom' % (cl_params['jparam_fftype']))
+        p_mass.append(cl_params['iparam_mass'])
+        p_mass.append(cl_params['jparam_mass'])
+        if mol.GetProp('pair_style') == 'lj':
+            p_coeff.append([cl_params['iparam_epsilon'], cl_params['iparam_sigma']])
+            p_coeff.append([cl_params['jparam_epsilon'], cl_params['jparam_sigma']])
+        else:
+            utils.radon_print('pair_style %s is not available.' % mol.GetProp('pair_style'), level=3)
+        cl_param_list[i]['iparam_atomtype'] = ip+1
+        cl_param_list[i]['jparam_atomtype'] = ip+2
+        ip += 2
+
+        # Add new bond type after bond create
+        ib += 1
+        unique_btype.append('%s,cl_new_bond' % (cl_params['bond_fftype']))
+        if mol.GetProp('bond_style') == 'harmonic':
+            b_coeff.append([cl_params['bond_k'], cl_params['bond_r0']])
+        else:
+            utils.radon_print('bond_style %s is not available.' % mol.GetProp('bond_style'), level=3)
+        cl_param_list[i]['bondtype'] = ib
+
+        # Add new bond type after bond create
+        if 'angle_k' in cl_params and 'angle_theta0' in cl_params:
+            ia += 1
+            unique_atype.append('*%s*,cl_new_angle' % cl_params['bond_fftype'])
+            if mol.GetProp('angle_style') == 'harmonic':
+                a_coeff.append([cl_params['angle_k'], cl_params['angle_theta0']])
+            else:
+                utils.radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
+            cl_param_list[i]['angletype'] = ia
+    #####################################################################################################
+
 
     utils.set_mol_id(mol)
 
@@ -2659,17 +2990,28 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
     lines.append('Generated by RadonPy')
     lines.append('')
     lines.append('%i atoms' % (mol.GetNumAtoms()))
-    if len(unique_ptype) > 0: lines.append('%i atom types' % (len(unique_ptype)))
-    lines.append('%i bonds' % (mol.GetNumBonds()))
-    if len(unique_btype) > 0: lines.append('%i bond types' % (len(unique_btype)))
-    lines.append('%i angles' % (len(mol.angles)))
-    if len(unique_atype) > 0: lines.append('%i angle types' % (len(unique_atype)))
-    lines.append('%i dihedrals' % (len(mol.dihedrals)))
-    if len(unique_dtype) > 0: lines.append('%i dihedral types' % (len(unique_dtype)))
+    if len(unique_ptype) > 0:
+        lines.append('%i atom types' % (len(unique_ptype)))
+
+    if len(unique_btype) > 0:
+        lines.append('%i bonds' % (mol.GetNumBonds()))
+        lines.append('%i bond types' % (len(unique_btype)))
+
+    if len(unique_atype) > 0:
+        lines.append('%i angles' % (len(mol.angles)))
+        lines.append('%i angle types' % (len(unique_atype)))
+
+    if len(unique_dtype) > 0:
+        lines.append('%i dihedrals' % (len(mol.dihedrals)))
+        lines.append('%i dihedral types' % (len(unique_dtype)))
+        
     if len(unique_itype) > 0:
         lines.append('%i impropers' % (len(mol.impropers)))
         lines.append('%i improper types' % (len(unique_itype)))
 
+    if len(unique_ctype) > 0:
+        lines.append('%i crossterms' % (len(mol.cmaps)))
+        
     if hasattr(mol, 'cell'):
         lines.append('')
         lines.append('%.16e %.16e xlo xhi' % (mol.cell.xlo, mol.cell.xhi))
@@ -2688,14 +3030,19 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, ptype in enumerate(unique_ptype):
-            lines.append('%5d\t%f\t# %s' % (i+1, p_mass[i], ptype))
+            if 0.0 < p_mass[i] and p_mass[i] < 1.0e-5:
+                lines.append('%5d\t%e\t# %s' % (i+1, p_mass[i], ptype))
+            else:
+                lines.append('%5d\t%f\t# %s' % (i+1, p_mass[i], ptype))
 
         lines.append('')
         lines.append('Pair Coeffs')
         lines.append('')
 
         for i, ptype in enumerate(unique_ptype):
-            lines.append('%5d\t%f\t%f\t# %s' % (i+1, p_coeff[i][0], p_coeff[i][1], ptype))
+            c = '\t'.join([ '%f' % x for x in p_coeff[i] ])
+            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, p_coeff[i][0], p_coeff[i][1], ptype))
+            lines.append('%5d\t%s\t# %s' % (i+1, c, ptype))
 
 
     if len(unique_btype) > 0:
@@ -2704,7 +3051,9 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, btype in enumerate(unique_btype):
-            lines.append('%5d\t%f\t%f\t# %s' % (i+1, b_coeff[i][0], b_coeff[i][1], btype))
+            c = '\t'.join([ '%f' % x for x in b_coeff[i] ])
+            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, b_coeff[i][0], b_coeff[i][1], btype))
+            lines.append('%5d\t%s\t# %s' % (i+1, c, btype))
 
 
     if len(unique_atype) > 0:
@@ -2713,7 +3062,9 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, atype in enumerate(unique_atype):
-            lines.append('%5d\t%f\t%f\t# %s' % (i+1, a_coeff[i][0], a_coeff[i][1], atype))
+            c = '\t'.join([ '%f' % x for x in a_coeff[i] ])
+            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, a_coeff[i][0], a_coeff[i][1], atype))
+            lines.append('%5d\t%s\t# %s' % (i+1, c, atype))
 
 
     if len(unique_dtype) > 0:
@@ -2722,11 +3073,14 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, dtype in enumerate(unique_dtype):
-            string = '%5d\t%i' % (i+1, d_coeff[i][0])
-            for j in range(d_coeff[i][0]):
-                string += '\t%f\t%i\t%f' % (d_coeff[i][j*3+1], d_coeff[i][j*3+2], d_coeff[i][j*3+3])
-            string += '\t# %s' % (dtype)
-            lines.append(string)
+            # string = '%5d\t%i' % (i+1, d_coeff[i][0])
+            # for j in range(d_coeff[i][0]):
+            #     string += '\t%f\t%i\t%f' % (d_coeff[i][j*3+1], d_coeff[i][j*3+2], d_coeff[i][j*3+3])
+            # string += '\t# %s' % (dtype)
+            # lines.append(string)
+            c = '\t'.join([ '%f' % x if isinstance(x, float) else '%i' % x for x in d_coeff[i]])
+            lines.append('%5d\t%s\t# %s' % (i+1, c, dtype))
+
 
     if len(unique_itype) > 0:
         lines.append('')
@@ -2734,7 +3088,9 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
         lines.append('')
 
         for i, itype in enumerate(unique_itype):
-            lines.append('%5d\t%f\t%i\t%i\t# %s' % (i+1, i_coeff[i][0], i_coeff[i][1], i_coeff[i][2], itype))
+            #lines.append('%5d\t%f\t%i\t%i\t# %s' % (i+1, i_coeff[i][0], i_coeff[i][1], i_coeff[i][2], itype))
+            c = '\t'.join([ '%f' % x if isinstance(x, float) else '%i' % x for x in i_coeff[i] ])
+            lines.append('%5d\t%s\t# %s' % (i+1, c, itype))
 
 
     if mol.GetNumAtoms() > 0:
@@ -2753,7 +3109,8 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
             lines.append('Velocities')
             lines.append('')
 
-            if not mol.GetAtomWithIdx(0).HasProp('vx'):
+            if not all([a.HasProp('vx') and a.HasProp('vy') and a.HasProp('vz')
+                        for a in mol.GetAtoms()]):
                 calc.set_velocity(mol, temp)
 
             for atom in mol.GetAtoms():
@@ -2801,10 +3158,29 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False):
             lines.append('%5d\t%i\t%i\t%i\t%i\t%i' %
                 (i+1, improper.ff.type_num, improper.a+1, improper.b+1, improper.c+1, improper.d+1))
 
-    return lines
+    cmap_lines = []
+    if hasattr(mol, 'cmaps'):
+        if len(mol.cmaps) > 0:
+            lines.append('')
+            lines.append('CMAP')
+            lines.append('')
+
+            for i, cmap in enumerate(mol.cmaps.values()):
+                lines.append('%5d\t%i\t%i\t%i\t%i\t%i\t%i' %
+                    (i+1, cmap.ff.type_num, cmap.a+1, cmap.b+1, cmap.c+1, cmap.d+1, cmap.e+1))
+
+        if len(unique_ctype) > 0:
+            for i, ctype in enumerate(unique_ctype):
+                cmap_lines.append('# %s' % (ctype))
+                for j in range(24):
+                    c = '\t'.join([ '%f' % x for x in c_coeff[i][j*24:(j+1)*24]])
+                    cmap_lines.append('%s' % (c))
+
+    return lines, cmap_lines
 
 
-def MolFromLAMMPSdata(file_name, bond_order=True):
+def MolFromLAMMPSdata(file_name, bond_order=True,
+    ff_style={'pair':'lj', 'bond':'harmonic', 'angle':'harmonic', 'dihedral':'fourier', 'improper':'cvff'}):
 
     flag = 'init'
     flag2 = False
@@ -2893,8 +3269,11 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    epsilon.append(float(vals[1]))
-                    sigma.append(float(vals[2]))
+                    if ff_style['pair'] == 'lj':
+                        epsilon.append(float(vals[1]))
+                        sigma.append(float(vals[2]))
+                    else:
+                        utils.radon_print('pair_style %s is not available.' % ff_style['pair'], level=3)
 
             elif flag == 'bond_c':
                 if not flag2:
@@ -2904,8 +3283,11 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    k_bond.append(float(vals[1]))
-                    r0.append(float(vals[2]))
+                    if ff_style['bond'] == 'harmonic':
+                        k_bond.append(float(vals[1]))
+                        r0.append(float(vals[2]))
+                    else:
+                        utils.radon_print('bond_style %s is not available.' % ff_style['bond'], level=3)
 
             elif flag == 'angle_c':
                 if not flag2:
@@ -2915,8 +3297,11 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    k_angle.append(float(vals[1]))
-                    theta0.append(float(vals[2]))
+                    if ff_style['angle'] == 'harmonic':
+                        k_angle.append(float(vals[1]))
+                        theta0.append(float(vals[2]))
+                    else:
+                        utils.radon_print('angle_style %s is not available.' % ff_style['angle'], level=3)
 
             elif flag == 'dihed_c':
                 if not flag2:
@@ -2929,14 +3314,21 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
                     n_dih_tmp = []
                     d0_dih_tmp = []
                     vals = line.split()
-                    m_dih.append(int(vals[1]))
-                    for j in range(int(vals[1])):
-                        k_dih_tmp.append(float(vals[j*3+2]))
-                        n_dih_tmp.append(int(vals[j*3+3]))
-                        d0_dih_tmp.append(float(vals[j*3+4]))
-                    k_dih.append(k_dih_tmp)
-                    n_dih.append(n_dih_tmp)
-                    d0_dih.append(d0_dih_tmp)
+                    if ff_style['dihedral'] == 'fourier':
+                        m_dih.append(int(vals[1]))
+                        for j in range(int(vals[1])):
+                            k_dih_tmp.append(float(vals[j*3+2]))
+                            n_dih_tmp.append(int(vals[j*3+3]))
+                            d0_dih_tmp.append(float(vals[j*3+4]))
+                        k_dih.append(k_dih_tmp)
+                        n_dih.append(n_dih_tmp)
+                        d0_dih.append(d0_dih_tmp)
+                    elif ff_style['dihedral'] == 'harmonic':
+                        k_dih.append(float(vals[1]))
+                        n_dih.append(float(vals[2]))
+                        d0_dih.append(float(vals[3]))
+                    else:
+                        utils.radon_print('dihedral_style %s is not available.' % ff_style['dihedral'], level=3)
 
             elif flag == 'impro_c':
                 if not flag2:
@@ -2946,9 +3338,15 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
                     flag2 = False
                 elif flag2:
                     vals = line.split()
-                    k_imp.append(float(vals[1]))
-                    d0_imp.append(float(vals[2]))
-                    n_imp.append(int(vals[3]))
+                    if ff_style['improper'] == 'cvff':
+                        k_imp.append(float(vals[1]))
+                        d0_imp.append(float(vals[2]))
+                        n_imp.append(int(vals[3]))
+                    elif ff_style['improper'] == 'umbrella':
+                        k_imp.append(float(vals[1]))
+                        d0_imp.append(float(vals[2]))
+                    else:
+                        utils.radon_print('improper_style %s is not available.' % ff_style['improper'], level=3)
 
             elif flag == 'atom':
                 if not flag2:
@@ -3040,14 +3438,19 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
                     impro_atom[i-1] = [int(vals[2]), int(vals[3]), int(vals[4]), int(vals[5])]
 
     rwmol = Chem.RWMol()
-    w2ele = {1:'H', 2:'H', 3:'H', 12:'C', 14:'N', 16:'O', 19:'F', 31:'P', 32:'S', 35:'Cl', 80:'Br', 127:'I'}
+    w2ele = {1:'H', 2:'H', 3:'H', 12:'C', 14:'N', 16:'O', 19:'F', 28:'Si', 31:'P', 32:'S', 35:'Cl', 80:'Br', 127:'I'}
 
     for i in range(n_data['atoms']):
         atom_tmp = Chem.Atom(w2ele[round(mass[atom_id[i]-1])])
         atom_tmp.SetProp('ff_type', str(atom_id[i]))
         atom_tmp.SetIntProp('ff_type_num', int(atom_id[i]))
-        atom_tmp.SetDoubleProp('ff_epsilon', float(epsilon[atom_id[i]-1]))
-        atom_tmp.SetDoubleProp('ff_sigma', float(sigma[atom_id[i]-1]))
+
+        if ff_style['pair'] == 'lj':
+            atom_tmp.SetDoubleProp('ff_epsilon', float(epsilon[atom_id[i]-1]))
+            atom_tmp.SetDoubleProp('ff_sigma', float(sigma[atom_id[i]-1]))
+        else:
+            utils.radon_print('pair_style %s is not available.' % ff_style['pair'], level=3)
+
         atom_tmp.SetDoubleProp('AtomicCharge', float(charge[i]))
         atom_tmp.SetIntProp('mol_id', int(mol_id[i]))
         if int(mass[atom_id[i]-1]) == 2: atom_tmp.SetIsotope(2)
@@ -3169,33 +3572,56 @@ def MolFromLAMMPSdata(file_name, bond_order=True):
         bond_idx = rwmol.AddBond(a_idx, b_idx, order=b_order)
         rwmol.GetBondWithIdx(bond_idx-1).SetProp('ff_type', str(bond_id[i]))
         rwmol.GetBondWithIdx(bond_idx-1).SetIntProp('ff_type_num', int(bond_id[i]))
-        rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_k', float(k_bond[bond_id[i]-1]))
-        rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_r0', float(r0[bond_id[i]-1]))
+        if ff_style['bond'] == 'harmonic':
+            rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_k', float(k_bond[bond_id[i]-1]))
+            rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_r0', float(r0[bond_id[i]-1]))
+        else:
+            utils.radon_print('bond_style %s is not available.' % ff_style['bond'], level=3)
 
     if bond_order: Chem.SanitizeMol(rwmol)
     mol = rwmol.GetMol()
 
     if 'angles' in n_data.keys():
         for i in range(n_data['angles']):
-            angle_ff_tmp = ff_class.GAFF_Angle(ff_type=angle_id[i], k=k_angle[angle_id[i]-1], theta0=theta0[angle_id[i]-1])
+            if ff_style['angle'] == 'harmonic':
+                angle_ff_tmp = ff_class.Angle_harmonic(ff_type=angle_id[i], k=k_angle[angle_id[i]-1], theta0=theta0[angle_id[i]-1])
+            else:
+                utils.radon_print('angle_style %s is not available.' % ff_style['angle'], level=3)
             utils.add_angle(mol, angle_atom[i][0]-1, angle_atom[i][1]-1, angle_atom[i][2]-1, ff=angle_ff_tmp)
     else:
         setattr(mol, 'angles', {})
 
     if 'dihedrals' in n_data.keys():
         for i in range(n_data['dihedrals']):
-            dihed_ff_tmp = ff_class.GAFF_Dihedral(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
-                                   m=m_dih[dihed_id[i]-1], n=n_dih[dihed_id[i]-1])
+            if ff_style['dihedral'] == 'fourier':
+                dihed_ff_tmp = ff_class.Dihedral_fourier(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
+                                       m=m_dih[dihed_id[i]-1], n=n_dih[dihed_id[i]-1])
+            elif ff_style['dihedral'] == 'harmonic':
+                dihed_ff_tmp = ff_class.Dihedral_harmonic(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
+                                       n=n_dih[dihed_id[i]-1])
+            else:
+                utils.radon_print('dihedral_style %s is not available.' % ff_style['dihedral'], level=3)
             utils.add_dihedral(mol, dihed_atom[i][0]-1, dihed_atom[i][1]-1, dihed_atom[i][2]-1, dihed_atom[i][3]-1, ff=dihed_ff_tmp)
     else:
         setattr(mol, 'dihedrals', {})
 
     if 'impropers' in n_data.keys():
         for i in range(n_data['impropers']):
-            impro_ff_tmp = ff_class.GAFF_Improper(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], d0=d0_imp[impro_id[i]-1], n=n_imp[impro_id[i]-1])
+            if ff_style['improper'] == 'cvff':
+                impro_ff_tmp = ff_class.Improper_cvff(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], d0=d0_imp[impro_id[i]-1], n=n_imp[impro_id[i]-1])
+            elif ff_style['improper'] == 'umbrella':
+                impro_ff_tmp = ff_class.Improper_umbrella(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], x0=x0_imp[impro_id[i]-1])
+            else:
+                utils.radon_print('improper_style %s is not available.' % ff_style['improper'], level=3)                
             utils.add_improper(mol, impro_atom[i][0]-1, impro_atom[i][1]-1, impro_atom[i][2]-1, impro_atom[i][3]-1, ff=impro_ff_tmp)
     else:
         setattr(mol, 'impropers', {})
+
+    mol.SetProp('pair_style', ff_style['pair']) 
+    mol.SetProp('bond_style', ff_style['bond'])
+    mol.SetProp('angle_style', ff_style['angle'])
+    mol.SetProp('dihedral_style', ff_style['dihedral'])
+    mol.SetProp('improper_style', ff_style['improper'])
 
     setattr(mol, 'cell', utils.Cell(cell_data['xhi'], cell_data['xlo'], cell_data['yhi'], cell_data['ylo'], cell_data['zhi'], cell_data['zlo']))
 

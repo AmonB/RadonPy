@@ -2,7 +2,7 @@ name: radonpy
 channels:
   - conda-forge
 dependencies:
-  - python==3.9
+  - python>=3.9
   - rdkit>=2020.03
   - mdtraj>=1.9
   - matplotlib

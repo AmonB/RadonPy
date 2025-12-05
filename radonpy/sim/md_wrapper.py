@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -17,7 +17,7 @@ except ImportError:
     gromacs_avail = False
 
 
-__version__ = '0.2.9'
+__version__ = '1.0b1'
 
 
 def MD_solver(md_solver='lammps', work_dir=None, solver_path=None, **kwargs):

@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2025. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -22,7 +22,7 @@ except ImportError:
     mic_avail = False
 
 
-__version__ = '0.3.0b3'
+__version__ = '1.0b1'
 
 
 class FF_descriptor():
@@ -807,7 +807,7 @@ def get_param_mp_wrapper(args):
     utils.restore_const(c)
 
     try:
-        if cyclic > 0 and smiles.count('*') == 2:
+        if cyclic > 0 and smi.count('*') == 2:
             mol = poly.make_cyclicpolymer(smi, n=cyclic, return_mol=True, removeHs=False)
         else:
             mol = Chem.MolFromSmiles(smi)
