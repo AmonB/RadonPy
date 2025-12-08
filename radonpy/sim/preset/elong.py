@@ -25,7 +25,7 @@ from scipy import optimize
 
 import radonpy
 from ...core import utils, calc
-from ..sim import lammps
+from .. import lammps
 from . import eq, tc
 from ..md import MD
 
