@@ -45,10 +45,17 @@ In this case, the environment variable must be set:
 export LAMMPS_EXEC=<Path-to-LAMMPS-binary>
 ```
 
-4. Installation of RadonPy
+4. Installation of RadonPy (version 0.2.x)
 ```
 pip install radonpy-pypi
 ```
+
+or a beta test version of RadonPy can be installed by
+```
+conda clone https://github.com/RadonPy/RadonPy.git
+pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
+```
+
 
 5. (Optional) RadonPy for Bio-polymers (peptides, polysaccharides, water models (tip3p, tip4p, tip5p))
 ```
@@ -82,6 +89,12 @@ export LAMMPS_EXEC=<Path-to-LAMMPS-binary>
 4. Installation of RadonPy
 ```
 pip install radonpy-pypi
+```
+
+or a beta test version of RadonPy can be installed by
+```
+conda clone https://github.com/RadonPy/RadonPy.git
+pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
 ```
 
 5. (Optional) RadonPy for Bio-polymers (peptides, polysaccharides, water models (tip3p, tip4p, tip5p))
