@@ -1,7 +1,7 @@
 ![logo](https://user-images.githubusercontent.com/83273612/160471242-40d7d7f1-d2cd-4658-b4e1-75f5e608665d.png)
 
 ## Overview
-RadonPy is the first open-source Python library for fully automated calculation for a comprehensive set of polymer properties, using all-atom classical MD simulations. For a given polymer repeating unit with its chemical structure, the entire process of the MD simulation can be carried out fully automatically, including molecular modelling, equilibrium and non-equilibrium MD simulations, automatic determination of the completion of equilibration, scheduling of restarts in case of failure to converge, and property calculations in the post-process step. In this release, the library comprises the calculation of 15 properties at the amorphous state.
+RadonPy is the first open-source Python library for fully automated calculation for a comprehensive set of polymer properties, using all-atom classical MD simulations. For a given polymer repeating unit with its chemical structure, the entire process of the MD simulation can be carried out fully automatically, including molecular modelling, equilibrium and non-equilibrium MD simulations, automatic determination of the completion of equilibration, scheduling of restarts in case of failure to converge, and property calculations in the post-process step. In this release, the library comprises the calculation of 62 properties at the amorphous state.
 
 ## Requirement
 - Python 3.9, 3.10, 3.11, 3.12, 3.13
@@ -86,7 +86,7 @@ In this case, the environment variable must be set:
 export LAMMPS_EXEC=<Path-to-LAMMPS-binary>
 ```
 
-4. Installation of RadonPy
+4. Installation of RadonPy (version 0.2.x)
 ```
 pip install radonpy-pypi
 ```
@@ -206,7 +206,7 @@ MD simulations are available in this installation, but DFT calculations (conform
 - Ryohei Hosoya (Institute of Science Tokyo) (Implementation of sim/preset/ef_dp.py, sim/preset/elong.py)
 - Hidemine Furuya (Institute of Science Tokyo) (Implementation of sim/preset/ef_dp.py, sim/preset/elong.py)
 - Hiroki Sugisawa (Mitsubishi Chemical Corporation) (Implementation of sim/preset/tg.py)
-- kazuyoshi Kaneko (The Yokohama Rubber Co., Ltd.) (Implementation of sim/preset/sp.py)
+- Kazuyoshi Kaneko (The Yokohama Rubber Co., Ltd.) (Implementation of sim/preset/sp.py)
 - Teruki Tsurimoto (Sekisui Chemical Co., Ltd.) (Implementation of ff/dreiding.py)
 - Shun Nanjo (SOKENDAI) (Determination of calculation conditions for Abbe number)
 
