@@ -52,7 +52,7 @@ pip install radonpy-pypi
 
 or a beta test version of RadonPy can be installed by
 ```
-conda clone https://github.com/RadonPy/RadonPy.git
+git clone https://github.com/RadonPy/RadonPy.git
 pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
 ```
 
@@ -93,7 +93,7 @@ pip install radonpy-pypi
 
 or a beta test version of RadonPy can be installed by
 ```
-conda clone https://github.com/RadonPy/RadonPy.git
+git clone https://github.com/RadonPy/RadonPy.git
 pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
 ```
 
