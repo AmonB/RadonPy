@@ -123,6 +123,15 @@ MD simulations are available in this installation, but DFT calculations (conform
 		- Polymer solution
 		- Crystalline polymer
 		- Oriented structure
+    - Assignment of force field
+		- GAFF
+		- GAFF2
+		- GAFF2_mod (J. Träg, D. Zahn, J. Mol. Model. 25:39 (2019))
+		- Dreiding
+		- Dreiding_UT (K. Sasaki, T. Yamashita, J. Chem. Inf. Model., 61:1172 (2021))
+        - Amber (amber_ff19SB)
+        - GLYCAM_06j
+        - Water models (TIP3P, TIP4P, TIP5P)
 	- Run for equilibration MD
 	- Checking archivement of equilibrium
 	- Run for non-equilibrium MD (NEMD)
@@ -180,7 +189,13 @@ MD simulations are available in this installation, but DFT calculations (conform
 2. S. Minami, Y. Hayashi, S. Wu, K. Fukumizu, H. Sugisawa, M. Ishii, I. Kuwajima, K. Shiratori, R. Yoshida, "Scaling law of Sim2Real transfer learning in expanding computational materials databases for real-world predictions," npj Comput. Mater. 11:146 (2025) \[[Link](https://www.nature.com/articles/s41524-025-01606-5)\]
 
 ## Contributors
-- Yoshihiro Hayashi (The Institute of Statistical Mathematics)
+- Yoshihiro Hayashi (The Institute of Statistical Mathematics) (Organizer, Leading developer)
+- Ryohei Hosoya (Institute of Science Tokyo) (Implementation of sim/preset/ef_dp.py, sim/preset/elong.py)
+- Hidemine Furuya (Institute of Science Tokyo) (Implementation of sim/preset/ef_dp.py, sim/preset/elong.py)
+- Hiroki Sugisawa (Mitsubishi Chemical Corporation) (Implementation of sim/preset/tg.py)
+- kazuyoshi Kaneko (The Yokohama Rubber Co., Ltd.) (Implementation of sim/preset/sp.py)
+- Teruki Tsurimoto (Sekisui Chemical Co., Ltd.) (Implementation of ff/dreiding.py)
+- Shun Nanjo (SOKENDAI) (Determination of calculation conditions for Abbe number)
 
 ## Related projects
 - XenonPy (Machine learning tools for materials informatics) \[[Link](https://github.com/yoshida-lab/XenonPy)\]
@@ -188,19 +203,24 @@ MD simulations are available in this installation, but DFT calculations (conform
 - SPACIER (Efficient molecular exploration tool using Bayesian Optimization combined with RadonPy) \[[Link](https://github.com/s-nanjo/Spacier/)\]
 
 ## Acknowledgements
-The development of RadonPy was financially supported by the following grants
+The development of RadonPy has been financially supported by the following grants:
 - Japan Science and Technology Agency (JST) CREST (Grant Number: JPMJCR19I3)
 - Ministry of Education, Culture, Sports, Science and Technology (MEXT) as “Program for Promoting Researches on the Supercomputer Fugaku” (Project ID: hp210264)
+- JST as "Program on Open Innovation Platform for Industry-Academia Co-creation (COI-NEXT)" (Grant Number: JPMJPF2102)
+- MEXT as "Data Creation and Utilization-Type Material Research and Development Project (DxMT)" (Grant Number: JPMXP1122714694)
 - The Japan Society for the Promotion of Science (JSPS) as the Grant-in-Aid for Scientific Research (A) (Grant Number: 19H01132)
+- JSPS as the Grant-in-Aid for Scientific Research (B) (Grant Number: 25K00147)
 - JSPS as the Grant-in-Aid for Scientific Research (C) (Grant Number: 22K11949)
- 
-The numerical calculations were conducted on the following supercomputer systems
+
+The numerical calculations were conducted on the following supercomputer systems:
 - Fugaku at the RIKEN Center for Computational Science, Kobe, Japan (Project ID: hp210264, hp210213)
-- The supercomputer at the Research Center for Computational Science, Okazaki, Japan (Project ID: 21-IMS-C126, 22-IMS-C125, 23-IMS-C113)
+- The supercomputer at the Research Center for Computational Science, Okazaki, Japan (Project ID: 21-IMS-C126, 22-IMS-C125, 23-IMS-C113, 24-IMS-C107, 25-IMS-C107)
 - The supercomputer Ohtaka at the Supercomputer Center, the Institute for Solid State Physics, the University of Tokyo, Tokyo, Japan
 - The supercomputer TSUBAME3.0 at the Tokyo Institute of Technology, Tokyo, Japan
 - The supercomputer ABCI at the National Institute of Advanced Industrial Science and Technology, Tsukuba, Japan
 
+The experimental varidation data was provided by:
+- PoLyInfo \[[Link](https://polymer.nims.go.jp/)\] developed by National Institute for Materials Science (NIMS)
 
 ## Copyright and licence
 ©Copyright 2025 The RadonPy developers, all rights reserved.
