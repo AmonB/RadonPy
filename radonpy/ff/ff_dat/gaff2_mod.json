@@ -762,6 +762,60 @@
             "epsilon": 0.2824,
             "sigma": 3.532413417426445,
             "desc": "Special s6 in conjugated systems"
+        },
+        {
+            "tag": "si",
+            "name": "si",
+            "elem": "Si",
+            "mass": 28.0855,
+            "epsilon": 0.015,
+            "sigma": 3.16804,
+            "desc": "sp3 silicon"
+        },
+        {
+            "tag": "ci",
+            "name": "ci",
+            "elem": "C",
+            "mass": 12.01,
+            "epsilon": 0.113,
+            "sigma": 3.56538,
+            "desc": "sp3 carbon covalently bonded to silicon"
+        },
+        {
+            "tag": "ng",
+            "name": "ng",
+            "elem": "N",
+            "mass": 14.01,
+            "epsilon": 0.473,
+            "sigma": 3.15913,
+            "desc": "sp3 nitrogen covalently bonded to silicon"
+        },
+        {
+            "tag": "oi",
+            "name": "oi",
+            "elem": "O",
+            "mass": 16.00,
+            "epsilon": 0.5,
+            "sigma": 3.24287,
+            "desc": "Hydroxyl oxygen covalently bonded to silicon"
+        },
+        {
+            "tag": "oss",
+            "name": "oss",
+            "elem": "O",
+            "mass": 16.00,
+            "epsilon": 0.5,
+            "sigma": 3.24287,
+            "desc": "Oxygen covalently bonded to two silicon atoms"
+        },
+        {
+            "tag": "hi",
+            "name": "hi",
+            "elem": "H",
+            "mass": 1.008,
+            "epsilon": 0.095,
+            "sigma": 2.59430,
+            "desc": "Hydrogen covalently bonded to silicon"
         }
     ],
     "bond_types": [
@@ -6644,6 +6698,55 @@
             "rname": "sy,sy",
             "k": 162.69,
             "r0": 2.25
+        },
+        {
+            "tag": "si,oi",
+            "name": "si,oi",
+            "rname": "oi,si",
+            "k": 301.7,
+            "r0": 1.674
+        },
+        {
+            "tag": "oi,ho",
+            "name": "oi,ho",
+            "rname": "ho,oi",
+            "k": 569.6,
+            "r0": 0.9730
+        },
+        {
+            "tag": "ci,hc",
+            "name": "ci,hc",
+            "rname": "hc,ci",
+            "k": 380.45,
+            "r0": 1.0936
+        },
+        {
+            "tag": "si,oss",
+            "name": "si,oss",
+            "rname": "oss,si",
+            "k": 357.87,
+            "r0": 1.6563
+        },
+        {
+            "tag": "si,ci",
+            "name": "si,ci",
+            "rname": "ci,si",
+            "k": 206.39,
+            "r0": 1.8719
+        },
+        {
+            "tag": "ci,c3",
+            "name": "ci,c3",
+            "rname": "c3,ci",
+            "k": 314.39,
+            "r0": 1.5412
+        },
+        {
+            "tag": "ci,ci",
+            "name": "ci,ci",
+            "rname": "ci,ci",
+            "k": 317.42,
+            "r0": 1.5515
         }
     ],
     "angle_types": [
@@ -38944,6 +39047,111 @@
             "rname": "sy,sy,sy",
             "k": 66.534,
             "theta0": 103.29
+        },
+        {
+            "tag": "ci,si,oi",
+            "name": "ci,si,oi",
+            "rname": "oi,si,ci",
+            "k": 3.010,
+            "theta0": 106.42
+        },
+        {
+            "tag": "si,oi,ho",
+            "name": "si,oi,ho",
+            "rname": "ho,oi,si",
+            "k": 20.780,
+            "theta0": 116.37
+        },
+        {
+            "tag": "ci,si,ci",
+            "name": "ci,si,ci",
+            "rname": "ci,si,ci",
+            "k": 45.388,
+            "theta0": 109.696
+        },
+        {
+            "tag": "hc,ci,hc",
+            "name": "hc,ci,hc",
+            "rname": "hc,ci,hc",
+            "k": 39.753,
+            "theta0": 107.039
+        },
+        {
+            "tag": "si,ci,hc",
+            "name": "si,ci,hc",
+            "rname": "hc,ci,si",
+            "k": 31.944,
+            "theta0": 108.978
+        },
+        {
+            "tag": "ci,si,oss",
+            "name": "ci,si,oss",
+            "rname": "oss,si,ci",
+            "k": 66.17,
+            "theta0": 107.558
+        },
+        {
+            "tag": "oss,si,oss",
+            "name": "oss,si,oss",
+            "rname": "oss,si,oss",
+            "k": 123.516,
+            "theta0": 108.864
+        },
+        {
+            "tag": "oss,si,oi",
+            "name": "oss,si,oi",
+            "rname": "oi,si,oss",
+            "k": 78.737,
+            "theta0": 109.641
+        },
+        {
+            "tag": "si,oss,si",
+            "name": "si,oss,si",
+            "rname": "si,oss,si",
+            "k": 34.373,
+            "theta0": 146.139
+        },
+        {
+            "tag": "c3,c3,ci",
+            "name": "c3,c3,ci",
+            "rname": "ci,c3,c3",
+            "k": 108.866,
+            "theta0": 113.585
+        },
+        {
+            "tag": "c3,ci,hc",
+            "name": "c3,ci,hc",
+            "rname": "hc,ci,c3",
+            "k": 52.161,
+            "theta0": 111.034
+        },
+        {
+            "tag": "c3,ci,si",
+            "name": "c3,ci,si",
+            "rname": "si,ci,c3",
+            "k": 75.772,
+            "theta0": 116.660
+        },
+        {
+            "tag": "ci,c3,hc",
+            "name": "ci,c3,hc",
+            "rname": "hc,c3,ci",
+            "k": 63.172,
+            "theta0": 110.133
+        },
+        {
+            "tag": "ci,ci,si",
+            "name": "ci,ci,si",
+            "rname": "si,ci,ci",
+            "k": 49.277,
+            "theta0": 112.581
+        },
+        {
+            "tag": "ci,ci,hc",
+            "name": "ci,ci,hc",
+            "rname": "hc,ci,ci",
+            "k": 58.530,
+            "theta0": 110.451
         }
     ],
     "dihedral_types": [
@@ -54274,6 +54482,171 @@
             ],
             "k": [
                 0.497
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "X,ci,c3,X",
+            "name": "X,ci,c3,X",
+            "rname": "X,c3,ci,X",
+            "d": [
+                0
+            ],
+            "k": [
+                0.578
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "X,si,oi,X",
+            "name": "X,si,oi,X",
+            "rname": "X,oi,si,X",
+            "d": [
+                0
+            ],
+            "k": [
+                0.2735
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "X,si,ci,X",
+            "name": "X,si,ci,X",
+            "rname": "X,ci,si,X",
+            "d": [
+                0
+            ],
+            "k": [
+                0.3525
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "X,ci,ci,X",
+            "name": "X,ci,ci,X",
+            "rname": "X,ci,ci,X",
+            "d": [
+                0
+            ],
+            "k": [
+                1.966
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "oss,si,oss,si",
+            "name": "oss,si,oss,si",
+            "rname": "si,oss,si,oss",
+            "d": [
+                0
+            ],
+            "k": [
+                0.1635
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "ci,si,oss,si",
+            "name": "ci,si,oss,si",
+            "rname": "si,oss,si,ci",
+            "d": [
+                0
+            ],
+            "k": [
+                0.1635
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "oi,si,oss,si",
+            "name": "oi,si,oss,si",
+            "rname": "si,oss,si,oi",
+            "d": [
+                0
+            ],
+            "k": [
+                0.0
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "ci,si,ci,hc",
+            "name": "ci,si,ci,hc",
+            "rname": "hc,ci,si,ci",
+            "d": [
+                0
+            ],
+            "k": [
+                0.0532
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "oss,si,ci,hc",
+            "name": "oss,si,ci,hc",
+            "rname": "hc,ci,si,oss",
+            "d": [
+                0
+            ],
+            "k": [
+                0.0532
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "c3,ci,si,ci",
+            "name": "c3,ci,si,ci",
+            "rname": "ci,si,ci,c3",
+            "d": [
+                0
+            ],
+            "k": [
+                0.174
+            ],
+            "m": 1,
+            "n": [
+                3
+            ]
+        },
+        {
+            "tag": "c3,ci,si,oss",
+            "name": "c3,ci,si,oss",
+            "rname": "oss,si,ci,c3",
+            "d": [
+                0
+            ],
+            "k": [
+                0.174
             ],
             "m": 1,
             "n": [
