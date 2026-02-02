@@ -3062,7 +3062,8 @@ def set_linker_flag(mol, reverse=False, label=1):
         atom.SetBoolProp('head_neighbor', False)
         atom.SetBoolProp('tail_neighbor', False)
         if (atom.GetSymbol() == "H" and atom.GetIsotope() == label+2) or \
-           (atom.GetSymbol() == "*" and atom.GetProp('ff_type') != "MTIP") or \
+           (atom.GetSymbol() == "*" and atom.HasProp('ff_type') and atom.GetProp('ff_type') != "MTIP") or \
+           (atom.GetSymbol() == "*" and not atom.HasProp('ff_type')) or \
            (atom.HasProp('terminal') and atom.GetBoolProp('terminal')):
             atom.SetBoolProp('linker', True)
             if not flag:
@@ -3585,7 +3586,7 @@ def substruct_match_smiles(poly_smiles, sub_smiles, useChirality=False):
         useChirality: enables the use of stereochemistry in the matching (boolean)
 
     Returns:
-        RDkit Mol object
+        bool: True if the poly_smiles has the sub_smiles, False otherwise
     """
 
     pmol = make_cyclicpolymer(poly_smiles, 3, return_mol=True)
@@ -3638,7 +3639,7 @@ def full_match_smiles(smiles1, smiles2, monomerize=True):
         smiles1, smiles2: polymer SMILES (str)
 
     Returns:
-        RDkit Mol object
+        bool: True if the molecules match, False otherwise
     """
     if monomerize:
         smiles1 = monomerization_smiles(smiles1)
