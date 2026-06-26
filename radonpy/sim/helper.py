@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -15,11 +15,11 @@ import importlib
 import pandas as pd
 import rdkit
 
-from ..core import utils
+from ..core import utils, calc
 from . import lammps
 from .preset import eq
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 def get_version():
@@ -297,17 +297,17 @@ class Pipeline_Helper():
             self.monomer_data = [mon for x in range(len(smi_list))]
 
         for k, v in self.data.items():
-            if re.search('_monomer\d+', k):
-                m = re.search('(.+)_monomer(\d+)', k)
+            if re.search(r'_monomer\d+', k):
+                m = re.search(r'(.+)_monomer(\d+)', k)
                 key = str(m.group(1))
                 idx = int(m.group(2))-1
                 self.monomer_data[idx][key] = v
-            elif re.search('smiles_\d+', k):
-                m = re.search('smiles_(\d+)', k)
+            elif re.search(r'smiles_\d+', k):
+                m = re.search(r'smiles_(\d+)', k)
                 idx = int(m.group(1))-1
                 self.monomer_data[idx]['smiles'] = v
-            elif re.search('monomer_ID_\d+', k):
-                m = re.search('monomer_ID_(\d+)', k)
+            elif re.search(r'monomer_ID_\d+', k):
+                m = re.search(r'monomer_ID_(\d+)', k)
                 idx = int(m.group(1))-1
                 self.monomer_data[idx]['monomer_ID'] = v
 
@@ -572,7 +572,8 @@ class IO_Helper():
         if type(share_dir) is not list:
             share_dir = [share_dir]
 
-        share_dir = [self.save_dir, self.work_dir, *share_dir, *self.share_dir]
+        f_dir = os.path.dirname(os.path.realpath(__file__))
+        share_dir = [self.save_dir, self.work_dir, *share_dir, *self.share_dir, os.path.join(f_dir, '..', 'core', 'ter')]
         ter1, ter2 = None, None
 
         if data_dict.get('ter_ID_1'):
@@ -714,6 +715,36 @@ class IO_Helper():
 
 
     def output_md_data(self, data_dict):
+        ratio = [float(x) for x in str(data_dict['copoly_ratio_list']).split(',')]
+
+        # Calculate refractive index
+        if 'refractive_index' not in data_dict and 'density' in data_dict:
+            polarizability = [data_dict[x] for x in data_dict.keys() if 'qm_polarizability_monomer' in str(x)]
+            mol_weight = [data_dict[x] for x in data_dict.keys() if 'mol_weight_monomer' in str(x)]
+            if len(polarizability) > 0 and len(mol_weight) > 0:
+                data_dict['refractive_index'] = calc.refractive_index(polarizability, data_dict['density'], mol_weight, ratio=ratio)
+
+        # Calculate refractive index at 486, 589, 656 nm
+        for l in [486, 589, 656]:
+            if 'refractive_index_sos_%i' % int(l) not in data_dict and 'density' in data_dict:
+                polarizability = [data_dict[x] for x in data_dict.keys() if 'qm_polarizability_sos_%i_monomer' % int(l) in str(x)]
+                mol_weight = [data_dict[x] for x in data_dict.keys() if 'mol_weight_monomer' in str(x)]
+                if len(polarizability) > 0 and len(mol_weight) > 0:
+                    data_dict['refractive_index_sos_%i' % int(l)] = calc.refractive_index(polarizability, data_dict['density'], mol_weight, ratio=ratio)
+
+        # Calculate Abbe number
+        if 'abbe_number_sos' not in data_dict and 'refractive_index_sos_486' in data_dict and 'refractive_index_sos_589' in data_dict and 'refractive_index_sos_656' in data_dict:
+            data_dict['abbe_number_sos'] = (data_dict['refractive_index_sos_589'] - 1)/(data_dict['refractive_index_sos_486'] - data_dict['refractive_index_sos_656'])
+
+        # Calculate dielectric constant dc (correlated by refractive_index**2 - 1)
+        if 'dielectric_const_dc' not in data_dict and 'refractive_index' in data_dict and 'static_dielectric_const' in data_dict:
+            data_dict['dielectric_const_dc'] = data_dict['static_dielectric_const'] + data_dict['refractive_index']**2 - 1
+
+        # Calculate thermal diffusivity
+        if 'thermal_diffusivity' not in data_dict and 'thermal_conductivity' in data_dict and 'density' in data_dict and 'Cp' in data_dict:
+            data_dict['thermal_diffusivity'] = calc.thermal_diffusivity(data_dict['thermal_conductivity'], data_dict['density'], data_dict['Cp'])
+
+        # Rename existing results.csv
         if os.path.isfile(os.path.join(self.save_dir, 'results.csv')):
             now = datetime.datetime.now()
             shutil.copyfile(os.path.join(self.save_dir, 'results.csv'),

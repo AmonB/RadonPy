@@ -68,7 +68,7 @@ class SPMD(preset.Preset):
         
         md.dump_file = None
         md.xtc_file = None
-        for i_chain in range(utils.count_mols(self.mol)):                  
+        for i_chain in range(min(utils.count_mols(self.mol), 31)):                  
             md.wf[-1].add.append(f'group mol{i_chain} molecule {i_chain+1}')
             md.wf[-1].add.append(f'compute mol{i_chain}_kspace mol{i_chain} group/group mol{i_chain} pair no kspace yes molecule intra')
             md.wf[-1].add.append(f'variable mol{i_chain}_elong_intra equal -c_mol{i_chain}_kspace')

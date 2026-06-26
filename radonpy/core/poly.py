@@ -22,7 +22,7 @@ from rdkit import RDLogger
 from . import calc, const, utils
 from ..ff.gaff2_mod import GAFF2_mod
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 MD_avail = True
 try:
@@ -3565,7 +3565,7 @@ def _make_cyclicpolymer_worker(args):
 def substruct_match_mol(pmol, smol, useChirality=False):
 
     psmi = Chem.MolToSmiles(pmol)
-    pmol = make_cyclicpolymer(psmi, 3, return_mol=True)
+    pmol = make_cyclicpolymer(psmi, 4, return_mol=True)
     if pmol is None:
         return False
 
@@ -3589,7 +3589,7 @@ def substruct_match_smiles(poly_smiles, sub_smiles, useChirality=False):
         bool: True if the poly_smiles has the sub_smiles, False otherwise
     """
 
-    pmol = make_cyclicpolymer(poly_smiles, 3, return_mol=True)
+    pmol = make_cyclicpolymer(poly_smiles, 4, return_mol=True)
     if pmol is None:
         return False
     smol = Chem.MolFromSmarts(sub_smiles)
@@ -3651,8 +3651,8 @@ def full_match_smiles(smiles1, smiles2, monomerize=True):
     except:
         return False
 
-    smi1 = make_cyclicpolymer(smiles1, n=3)
-    smi2 = make_cyclicpolymer(smiles2, n=3)
+    smi1 = make_cyclicpolymer(smiles1, n=4)
+    smi2 = make_cyclicpolymer(smiles2, n=4)
     if smi1 is None or smi2 is None:
         return False
 
@@ -3751,7 +3751,7 @@ def _make_full_match_smiles(args):
 
     if monomerize:
         smi = monomerization_smiles(smi)
-    smi = make_cyclicpolymer(smi, n=3)
+    smi = make_cyclicpolymer(smi, n=4)
     if smi is None:
         return args[0]
 
@@ -3819,7 +3819,7 @@ def monomerization_smiles(smiles, min_length=1, label=1):
             fmol = Chem.FragmentOnBonds(mol, bidx, addDummies=True)
             try:
                 RDLogger.DisableLog('rdApp.*')
-                fsmi = [Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]', '[*]', x).replace('[%iH]' % int(label+2), '[*]'))) for x in Chem.MolToSmiles(fmol).split('.')]
+                fsmi = [Chem.MolToSmiles(Chem.MolFromSmiles(re.sub(r'\[[0-9]+\*\]', '[*]', x).replace('[%iH]' % int(label+2), '[*]'))) for x in Chem.MolToSmiles(fmol).split('.')]
             except:
                 RDLogger.EnableLog('rdApp.*')
                 continue
@@ -4956,14 +4956,93 @@ def polymerize_ladder_rw(mol, n, init_poly=None, headhead=False, confId=0, tacti
 
     return poly
 
+
 def mol_from_amino_residues(residues):
 
     f_dir = os.path.dirname(os.path.realpath(__file__))
 
-    mols = [utils.mol_from_pdb(os.path.join(f_dir, 'pdb', res + '.pdb'), charge=True)
+    mols = [utils.mol_from_pdb(os.path.join(f_dir, 'amino', res + '.pdb'), charge=True)
             for res in residues]
 
     mol = block_copolymerize_mols(mols, 1, tacticity='isotactic')
     
     return mol
+
+
+def mol_from_amino_residues_new(residues, his_type='HIS', his_ratio=0.8):
+
+    f_dir = os.path.dirname(os.path.realpath(__file__))
+
+    if isinstance(residues, str):
+        residues = amino1to3(residues, his_type=his_type)
+
+    # mols = [utils.mol_from_pdb(os.path.join(f_dir, 'amino', res + '.pdb'), charge=True)
+    #         for res in residues]
+
+    mols = []
+    for res in residues:
+        if res == 'HIS':
+            res = 'HIE' if np.random.uniform(0, 1) < his_ratio else 'HID'
+        mols.append(utils.mol_from_pdb(os.path.join(f_dir, 'amino', res + '.pdb'), charge=True))
+
+    mol = block_copolymerize_mols(mols, 1, tacticity='isotactic')
+    
+    return mol
+
+
+def amino1to3(seq, mode='aq', his_type='HIS'):
+    if mode == 'aq':
+        code_dic = {
+            'A': 'ALA',
+            'C': 'CYS',
+            'D': 'ASP',
+            'E': 'GLU',
+            'F': 'PHE',
+            'G': 'GLY',
+            'H': his_type,
+            'I': 'ILE',
+            'K': 'LYS',
+            'L': 'LEU',
+            'M': 'MET',
+            'N': 'ASN',
+            'P': 'PRO',
+            'Q': 'GLN',
+            'R': 'ARG',
+            'S': 'SER',
+            'T': 'THR',
+            'V': 'VAL',
+            'W': 'TRP',
+            'Y': 'TYR'
+        }
+    elif mode == 'neutral':
+        code_dic = {
+            'A': 'ALA',
+            'C': 'CYS',
+            'D': 'ASH',
+            'E': 'GLU',
+            'F': 'PHE',
+            'G': 'GLY',
+            'H': his_type,
+            'I': 'ILE',
+            'K': 'LYS',
+            'L': 'LEU',
+            'M': 'MET',
+            'N': 'ASN',
+            'P': 'PRO',
+            'Q': 'GLN',
+            'R': 'ARG',
+            'S': 'SER',
+            'T': 'THR',
+            'V': 'VAL',
+            'W': 'TRP',
+            'Y': 'TYR'
+        }
+    else:
+        utils.radon_print('Mode %s is not available in poly.amino1to3' % mode, level=3)
+    
+    amino_array = [code_dic[s] for s in seq]
+    amino_array[0] = 'N'+amino_array[0]
+    amino_array[-1] = 'C'+amino_array[-1]
+    
+    return amino_array
 

@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -22,7 +22,7 @@ from ..ff import ff_class
 # CL Modification **************************************
 import collections
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 mdtraj_avail = True
 try:
@@ -897,7 +897,7 @@ class LAMMPS():
 
 
     def make_input_efield(self, md, wf, i, indata, unfix, nounfix=False):
-        evalue = wf.efield_value if wf.efield_freq == 0.0 else 'v_efac'
+        evalue = wf.efield_value if wf.efield_freq == 0.0 and wf.efield_rate == 0.0 else 'v_efac'
         if wf.efield_axis == 'x':
             ex = evalue
             ey = 0.0
@@ -935,7 +935,9 @@ class LAMMPS():
             ez = wf.efield_z
 
         if wf.efield_freq != 0.0:
-            indata.append('variable efac equal %f*sin(2*PI*%f*time*1e-15)' % (wf.efield_value, wf.efield_freq))
+            indata.append('variable efac equal %e*cos(2*PI*%e*time*1e-15)' % (wf.efield_value, wf.efield_freq))
+        elif wf.efield_rate != 0.0:
+            indata.append('variable efac equal %e*time' % (wf.efield_rate))
         indata.append('fix EF%i all efield %s %s %s' % (i+1, ex, ey, ez))
         if not nounfix:
             unfix.append('unfix EF%i' % (i+1))

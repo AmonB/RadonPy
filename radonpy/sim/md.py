@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -12,7 +12,7 @@ from rdkit import Geometry as Geom
 from .md_wrapper import MD_solver, MD_analyzer
 from ..core import calc, utils
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 class MD():
@@ -215,11 +215,12 @@ class Dynamics():
         return False
 
 
-    def add_efield(self, evalue=1.0, axis='x', freq=0.0, **kwargs):
+    def add_efield(self, evalue=1.0, axis='x', rate=0.0, freq=0.0, **kwargs):
         # fix efield
         self.efield = True
         self.efield_value = evalue
         self.efield_axis = axis
+        self.efield_rate = rate
         self.efield_freq = freq
         self.efield_x = kwargs.get('ex', None)
         self.efield_y = kwargs.get('ey', None)

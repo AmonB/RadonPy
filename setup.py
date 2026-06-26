@@ -36,10 +36,12 @@ assert url
 setup(
     name=package_name,
     packages=[
-        source_root, source_root+'/core', source_root+'/ff', source_root+'/ff/ff_dat',
-        source_root+'/sim', source_root+'/sim/preset'
+        source_root, source_root+'/core', source_root+'/core/amino', source_root+'/core/ter',
+        source_root+'/ff', source_root+'/ff/ff_dat',
+        source_root+'/sim', source_root+'/sim/preset',
+        source_root+'/dev', source_root+'/dev/sim', source_root+'/dev/sim/preset', 
     ],
-    package_data={'': [source_root+'/ff/ff_dat/*.json']},
+    package_data={'': [source_root+'/ff/ff_dat/*.json', source_root+'/core/amino/*.pdb', source_root+'/core/ter/*.json']},
     include_package_data=True,
     install_requires=[
         'numpy',
@@ -78,7 +80,7 @@ setup(
     keywords='polymer informatics, molecular dynamics',
 
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',

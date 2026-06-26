@@ -1,0 +1,86 @@
+{
+  "commonchem": {
+    "version": 10
+  },
+  "defaults": {
+    "atom": {
+      "z": 6,
+      "impHs": 0,
+      "chg": 0,
+      "nRad": 0,
+      "isotope": 0,
+      "stereo": "unspecified"
+    },
+    "bond": {
+      "bo": 1,
+      "stereo": "unspecified"
+    }
+  },
+  "molecules": [
+    {
+      "atoms": [
+        {
+          "z": 1,
+          "isotope": 3
+        },
+        {
+          "z": 1
+        }
+      ],
+      "bonds": [
+        {
+          "atoms": [
+            0,
+            1
+          ]
+        }
+      ],
+      "conformers": [
+        {
+          "dim": 3,
+          "coords": [
+            [
+              0.3702,
+              0.0,
+              0.0
+            ],
+            [
+              -0.3702,
+              -0.0,
+              0.0
+            ]
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "name": "rdkitRepresentation",
+          "formatVersion": 2,
+          "toolkitVersion": "2023.03.1"
+        },
+        {
+          "name": "radonpy_extention",
+          "formatVersion": 1,
+          "lib_version": "0.3.0b3",
+          "atoms": [
+            {
+              "AtomicCharge": 2.9454575803641126e-07,
+              "RESP": 2.9454575803641126e-07,
+              "ESP": 2.9454575803641126e-07,
+              "isotope": 3
+            },
+            {
+              "AtomicCharge": -2.9454575803602544e-07,
+              "RESP": -2.9454575803602544e-07,
+              "ESP": -2.9454575803602544e-07,
+              "isotope": 0
+            }
+          ],
+          "bonds": [
+            {}
+          ]
+        }
+      ]
+    }
+  ]
+}

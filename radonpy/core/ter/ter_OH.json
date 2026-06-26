@@ -1,0 +1,161 @@
+{
+  "commonchem": {
+    "version": 10
+  },
+  "defaults": {
+    "atom": {
+      "z": 6,
+      "impHs": 0,
+      "chg": 0,
+      "nRad": 0,
+      "isotope": 0,
+      "stereo": "unspecified"
+    },
+    "bond": {
+      "bo": 1,
+      "stereo": "unspecified"
+    }
+  },
+  "molecules": [
+    {
+      "atoms": [
+        {
+          "z": 1,
+          "isotope": 3
+        },
+        {
+          "z": 8
+        },
+        {
+          "z": 1
+        }
+      ],
+      "bonds": [
+        {
+          "atoms": [
+            0,
+            1
+          ]
+        },
+        {
+          "atoms": [
+            1,
+            2
+          ]
+        }
+      ],
+      "conformers": [
+        {
+          "dim": 3,
+          "coords": [
+            [
+              -0.7548,
+              -0.5314,
+              0.0
+            ],
+            [
+              -0.0001,
+              0.0665,
+              0.0
+            ],
+            [
+              0.7591,
+              -0.5253,
+              0.0
+            ]
+          ]
+        }
+      ],
+      "properties": {
+        "pair_style": "lj",
+        "bond_style": "harmonic",
+        "angle_style": "harmonic",
+        "dihedral_style": "fourier",
+        "improper_style": "cvff",
+        "head_idx": 0,
+        "tail_idx": 0,
+        "head_ne_idx": 1,
+        "tail_ne_idx": 1
+      },
+      "extensions": [
+        {
+          "name": "rdkitRepresentation",
+          "formatVersion": 2,
+          "toolkitVersion": "2023.03.1"
+        },
+        {
+          "name": "radonpy_extention",
+          "formatVersion": 1,
+          "lib_version": "0.3.0b3",
+          "atoms": [
+            {
+              "ff_type": "hw",
+              "ff_epsilon": 0.0,
+              "ff_sigma": 0.0,
+              "AtomicCharge": 0.4005573319882324,
+              "RESP": 0.4005573319882324,
+              "ESP": 0.4005573319882328,
+              "vx": 0.0,
+              "vy": 0.0,
+              "vz": 0.0,
+              "isotope": 3,
+              "mol_id": 1
+            },
+            {
+              "ff_type": "ow",
+              "ff_epsilon": 0.152,
+              "ff_sigma": 3.150752406575124,
+              "AtomicCharge": -0.80098726571797,
+              "RESP": -0.80098726571797,
+              "ESP": -0.8009872657179703,
+              "vx": 0.0,
+              "vy": 0.0,
+              "vz": 0.0,
+              "isotope": 0,
+              "mol_id": 1
+            },
+            {
+              "ff_type": "hw",
+              "ff_epsilon": 0.0,
+              "ff_sigma": 0.0,
+              "AtomicCharge": 0.4004299337297374,
+              "RESP": 0.4004299337297374,
+              "ESP": 0.4004299337297376,
+              "vx": 0.0,
+              "vy": 0.0,
+              "vz": 0.0,
+              "isotope": 0,
+              "mol_id": 1
+            }
+          ],
+          "bonds": [
+            {
+              "ff_type": "ow,hw",
+              "ff_k": 612.98,
+              "ff_r0": 0.957
+            },
+            {
+              "ff_type": "ow,hw",
+              "ff_k": 612.98,
+              "ff_r0": 0.957
+            }
+          ],
+          "angles": [
+            {
+              "a": 0,
+              "b": 1,
+              "c": 2,
+              "ff": {
+                "ff_type": "hw,ow,hw",
+                "k": 43.276,
+                "theta0": 104.52
+              }
+            }
+          ],
+          "dihedrals": [],
+          "impropers": []
+        }
+      ]
+    }
+  ]
+}

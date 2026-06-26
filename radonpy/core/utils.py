@@ -19,7 +19,7 @@ from rdkit.Chem import AllChem
 from . import const
 from ..ff import ff_class
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 class Angle():
@@ -1170,7 +1170,7 @@ def tqdm_stub(it, **kwargs):
 
 def star2h(smiles):
     smiles = smiles.replace('[*]', '[3H]')
-    smiles = re.sub('\[([0-9]+)\*\]', lambda m: '[%iH]' % int(int(m.groups()[0])+2), smiles)
+    smiles = re.sub(r'\[([0-9]+)\*\]', lambda m: '[%iH]' % int(int(m.groups()[0])+2), smiles)
     smiles = smiles.replace('*', '[3H]')
     smiles = smiles.replace('[X]', '[65535H]')
     smiles = smiles.replace('[LP-]', '[65534H-]')
@@ -1182,7 +1182,7 @@ def h2star(smiles):
     smiles = smiles.replace('[65535H]', '[X]')
     smiles = smiles.replace('[3H]', '*')
     smiles = re.sub(
-        '\[([0-9]+)H\]',
+        r'\[([0-9]+)H\]',
         lambda m: '[%i*]' % int(int(m.groups()[0])-2) if int(int(m.groups()[0])) >= 3 else '[%iH]' % int(int(m.groups()[0])),
         smiles)
     return smiles
@@ -1339,9 +1339,9 @@ def mol_from_smiles(smiles, coord=True, version=3, ez='E', chiral='S', stereoche
 
     return mol
 
-def mol_from_pdb(pdb_file, charge=False):
+def mol_from_pdb(pdb_file, charge=False, proximityBonding=True):
 
-    mol = Chem.MolFromPDBFile(pdb_file, removeHs=False)
+    mol = Chem.MolFromPDBFile(pdb_file, removeHs=False, proximityBonding=proximityBonding)
 
     # read charges
     if charge:
@@ -1375,7 +1375,7 @@ def mol_from_pdb(pdb_file, charge=False):
 
     natom = mol.GetNumAtoms()
     for i, atom in enumerate(mol.GetAtoms()):
-        atom.SetProp('ff_type', atom.GetPDBResidueInfo().GetName())
+        atom.SetProp('ff_type', atom.GetPDBResidueInfo().GetName().replace(' ', ''))
         atom.SetBoolProp('terminal', i == 0 or i == natom - 1)
         
     return mol
