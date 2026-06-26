@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -16,7 +16,7 @@ from rdkit import Geometry as Geom
 from ...core import poly, utils, calc, const
 from .. import lammps, preset
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 class NEMD_MP(preset.Preset):
@@ -469,7 +469,7 @@ quit
 
 
 class NEMD_MP_Analyze(lammps.Analyze):
-    def __init__(self, axis='x', prefix='', **kwargs):
+    def __init__(self, axis='x', prefix='', ignore_log=[], **kwargs):
         kwargs['log_file'] = kwargs.get('log_file', '%snemd_TC-MP_%s.log' % (prefix, axis))
         super().__init__(ignore_log=ignore_log, **kwargs)
         self.axis = axis
@@ -1540,7 +1540,7 @@ quit
         return True
 
 
-    def analyze(self):
+    def analyze(self, ignore_log=[]):
 
         anal = NEMD_Langevin_Analyze(
             axis = self.axis,
@@ -1549,7 +1549,8 @@ quit
             JDprof_file  = os.path.join(self.work_dir, self.JDprof_file),
             traj_file = os.path.join(self.work_dir, self.xtc_file),
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
-            dat_file  = os.path.join(self.work_dir, self.dat_file)
+            dat_file  = os.path.join(self.work_dir, self.dat_file),
+            ignore_log = ignore_log,
         )
 
         return anal
@@ -1557,9 +1558,9 @@ quit
 
 
 class NEMD_Langevin_Analyze(lammps.Analyze):
-    def __init__(self, axis='x', prefix='', **kwargs):
+    def __init__(self, axis='x', prefix='', ignore_log=[], **kwargs):
         kwargs['log_file'] = kwargs.get('log_file', '%snemd_TC-MP_%s.log' % (prefix, axis))
-        super().__init__(**kwargs)
+        super().__init__(ignore_log=ignore_log, **kwargs)
         self.axis = axis
         self.tprof_file = kwargs.get('tprof_file', '%sslabtemp_%s.profile' % (prefix, axis))
         self.JDprof_file = kwargs.get('JDprof_file', '%sheatflux_decomp_%s.profile' % (prefix, axis))
@@ -1988,13 +1989,14 @@ quit
         return True
 
 
-    def analyze(self):
+    def analyze(self, ignore_log=[]):
 
         anal = lammps.Analyze(
             log_file  = os.path.join(self.work_dir, self.log_file),
             traj_file = os.path.join(self.work_dir, self.xtc_file),
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
-            dat_file  = os.path.join(self.work_dir, self.dat_file)
+            dat_file  = os.path.join(self.work_dir, self.dat_file),
+            ignore_log = ignore_log,
         )
 
         return anal

@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -22,22 +22,28 @@ except ImportError:
     mic_avail = False
 
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 class FF_descriptor():
-    def __init__(self, ff, charge_max=1.0, charge_min=-1.0, polar=True, polar_max=2.0, deuterium=False,
+    def __init__(self, ff, charge_max=1.0, charge_min=-1.0, polar=True, polar_max=2.0, deuterium=False, si=False,
                 stats=['mean', 'std', 'max', 'min'], df=True, **kwargs):
         ignore_pt = ['hw', 'n4', 'nx', 'ny', 'nz', 'n+']
         self.ff = ff
         self.polar = polar
         self.deuterium = deuterium
+        self.si = si
         self.stats = stats
         self.df = df
 
         # Get FF parameter list
         self.ff_mass = [1.008, 12.011, 14.007, 15.999, 18.998, 30.974, 32.067, 35.453, 79.904, 126.904] # H,C,N,O,F,P,S,Cl,Br,I
-        self.ff_mass_D = [1.008, 2.014, 12.011, 14.007, 15.999, 18.998, 30.974, 32.067, 35.453, 79.904, 126.904] # H,C,N,O,F,P,S,Cl,Br,I
+        if deuterium:
+            self.ff_mass.append(2.014)
+        if si:
+            self.ff_mass.append(28.086)
+        self.ff_mass.sort()
+
         self.ff_epsilon = []
         self.ff_sigma = []
         for key, val in ff.param.pt.items():
@@ -116,10 +122,7 @@ class FF_descriptor():
 
         # Setting mu_mass
         if self.mu_mass is None:
-            if self.deuterium:
-                mu_mass = self.mass_scale.scale(self.ff_mass_D)
-            else:
-                mu_mass = self.mass_scale.scale(self.ff_mass)
+            mu_mass = self.mass_scale.scale(self.ff_mass)
         else:
             mu_mass = self.mu_mass
 
@@ -467,8 +470,12 @@ class FF_descriptor():
         if nk is None:
             nk = self.nk
 
-        if self.deuterium:
+        if self.deuterium and self.si:
+            desc_names = ['mass_H', 'mass_D', 'mass_C', 'mass_N', 'mass_O', 'mass_F', 'mass_Si', 'mass_P', 'mass_S', 'mass_Cl', 'mass_Br', 'mass_I']
+        elif self.deuterium:
             desc_names = ['mass_H', 'mass_D', 'mass_C', 'mass_N', 'mass_O', 'mass_F', 'mass_P', 'mass_S', 'mass_Cl', 'mass_Br', 'mass_I']
+        elif self.si:
+            desc_names = ['mass_H', 'mass_C', 'mass_N', 'mass_O', 'mass_F', 'mass_Si', 'mass_P', 'mass_S', 'mass_Cl', 'mass_Br', 'mass_I']
         else:
             desc_names = ['mass_H', 'mass_C', 'mass_N', 'mass_O', 'mass_F', 'mass_P', 'mass_S', 'mass_Cl', 'mass_Br', 'mass_I']
 
@@ -638,12 +645,8 @@ class FF_descriptor():
         elif isinstance(mic_seri, list) or isinstance(mic_seri, np.array):
             mic_val = np.array(mic_seri)
 
-        if self.deuterium:
-            num_l += 11
-            plt.bar(range(num_l), mic_val[num_i:num_l], align="center", width=0.5)
-        else:
-            num_l += 10
-            plt.bar(range(num_l), mic_val[num_i:num_l], align="center", width=0.5)
+        num_l += len(self.ff_mass)
+        plt.bar(range(num_l), mic_val[num_i:num_l], align="center", width=0.5)
 
         if self.polar:
             n = 9

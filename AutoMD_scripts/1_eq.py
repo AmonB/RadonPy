@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
-__version__ = '1.0_b1'
+__version__ = '1.0b2'
 
 import matplotlib
 matplotlib.use('Agg')
@@ -13,7 +13,7 @@ import pandas as pd
 import os
 import uuid
 
-from radonpy.core import utils, calc, poly
+from radonpy.core import utils, poly
 from radonpy.sim import helper
 from radonpy.sim.preset import eq
 from radonpy.ff.gaff import GAFF
@@ -99,9 +99,9 @@ if __name__ == '__main__':
         ff = GAFF2()
     elif data['forcefield'] == 'GAFF2_mod':
         ff = GAFF2_mod()
-    elif data['forcefield'] == 'Dreiding' and dreiding_avail:
+    elif data['forcefield'] == 'Dreiding':
         ff = Dreiding()
-    elif data['forcefield'] == 'Dreiding_UT' and dreiding_avail:
+    elif data['forcefield'] == 'Dreiding_UT':
         ff = Dreiding_UT()
     else:
         raise ValueError("Force field %s is not available." % data['forcefield'])
@@ -134,8 +134,6 @@ if __name__ == '__main__':
         copoly_list = poly.random_copolymerize_rw_mp(mols, n, ratio=ratio, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2,
                                                      nchain=data['input_nchain'], **rw_setting)
         for i in range(data['input_nchain']):
-            copoly_list[i] = poly.terminate_rw(copoly_list[i], ter, ter2)
-
             # Force field assignment
             result = ff.ff_assign(copoly_list[i])
             if not result:
@@ -214,11 +212,11 @@ if __name__ == '__main__':
     # Reload monomer csv data
     data = io.load_monomer_csv(share_dir=monomer_dir, data_dict=data)
 
-    # Calculate refractive index
-    polarizability = [data[x] for x in data.keys() if 'qm_polarizability_monomer' in str(x)]
-    mol_weight = [data[x] for x in data.keys() if 'mol_weight_monomer' in str(x)]
-    if len(polarizability) > 0 and len(mol_weight) > 0:
-        prop_data['refractive_index'] = calc.refractive_index(polarizability, prop_data['density'], mol_weight, ratio=ratio)
+    # # Calculate refractive index
+    # polarizability = [data[x] for x in data.keys() if 'qm_polarizability_monomer' in str(x)]
+    # mol_weight = [data[x] for x in data.keys() if 'mol_weight_monomer' in str(x)]
+    # if len(polarizability) > 0 and len(mol_weight) > 0:
+    #     prop_data['refractive_index'] = calc.refractive_index(polarizability, prop_data['density'], mol_weight, ratio=ratio)
 
     data['check_eq'] = result
     data['do_TC'] = result

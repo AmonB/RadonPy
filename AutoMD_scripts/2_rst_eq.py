@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-#  Copyright (c) 2023. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
-__version__ = '0.2.8'
+__version__ = '1.0b2'
 
 import matplotlib
 matplotlib.use('Agg')
@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 import pandas as pd
 import os
 
-from radonpy.core import utils, calc
+from radonpy.core import utils
 from radonpy.sim import helper
 from radonpy.sim.preset import eq
 
@@ -72,12 +72,12 @@ if __name__ == '__main__':
     # Reload MD csv data
     data = io.load_md_csv(data)
 
-    # Calculate refractive index
-    polarizability = [data[x] for x in data.keys() if 'qm_polarizability_monomer' in str(x)]
-    mol_weight = [data[x] for x in data.keys() if 'mol_weight_monomer' in str(x)]
-    ratio = [float(x) for x in str(data['copoly_ratio_list']).split(',')] if 'copoly_ratio_list' in data.keys() else None
-    if len(polarizability) > 0 and len(mol_weight) > 0:
-        prop_data['refractive_index'] = calc.refractive_index(polarizability, prop_data['density'], mol_weight, ratio=ratio)
+    # # Calculate refractive index
+    # polarizability = [data[x] for x in data.keys() if 'qm_polarizability_monomer' in str(x)]
+    # mol_weight = [data[x] for x in data.keys() if 'mol_weight_monomer' in str(x)]
+    # ratio = [float(x) for x in str(data['copoly_ratio_list']).split(',')] if 'copoly_ratio_list' in data.keys() else None
+    # if len(polarizability) > 0 and len(mol_weight) > 0:
+    #     prop_data['refractive_index'] = calc.refractive_index(polarizability, prop_data['density'], mol_weight, ratio=ratio)
 
     data.update(prop_data)
     data['check_eq'] = result

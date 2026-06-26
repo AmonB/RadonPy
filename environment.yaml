@@ -6,10 +6,9 @@ dependencies:
   - rdkit>=2020.03
   - mdtraj>=1.9
   - matplotlib
-  - pint>0.24
-  - ipykernel
   - numpy
   - pandas
+  - psutil
   - scipy
   - psi4
   - dftd3-python

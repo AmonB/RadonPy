@@ -9,7 +9,7 @@ RadonPy is the first open-source Python library for fully automated calculation 
 - rdkit >= 2020.03
 - psi4 >= 1.5
 - resp
-- dftd3
+- dftd3-python
 - mdtraj >= 1.9
 - scipy
 - matplotlib
@@ -21,16 +21,18 @@ User manual and conda packages are currently in preparation.
 
 [PDF file](https://github.com/RadonPy/RadonPy/blob/develop/docs/RadonPy_tutorial_20220331.pdf) of RadonPy tutorial is available.
 
-### Installation for conda (for Psi4 >= 1.8):
+### Installation for conda (for python=3.13, psi4=1.10):
+Notice: Runtime errors may occur in Psi4 when installed Python packages from different channels are mixed. Therefore, the option `-c conda-forge` should be added in the conda installation.
+
 1. Create conda environment
 ```
-conda create -n radonpy python=3.11
+conda create -n radonpy python=3.13 -c conda-forge
 conda activate radonpy
 ```
 
 2. Installation of requirement packages by conda
 ```
-conda install -c conda-forge/label/libint_dev -c conda-forge -c psi4 rdkit psi4 resp mdtraj matplotlib
+conda install -c conda-forge rdkit psi4 dftd3-python resp mdtraj psutil scipy pandas matplotlib pip
 ```
 
 3. Installation of LAMMPS by conda
@@ -45,15 +47,15 @@ In this case, the environment variable must be set:
 export LAMMPS_EXEC=<Path-to-LAMMPS-binary>
 ```
 
-4. Installation of RadonPy (version 0.2.x)
-```
-pip install radonpy-pypi
-```
-
-or a beta test version of RadonPy can be installed by
+4. Installation of a beta test version of RadonPy (1.0b2) can be installed by
 ```
 git clone https://github.com/RadonPy/RadonPy.git
 pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
+```
+
+or an old version of RadonPy (0.2.x) can be installed by
+```
+pip install radonpy-pypi
 ```
 
 
@@ -62,45 +64,7 @@ pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
 conda install -c conda-forge ambertools intermol
 ```
 
-### Installation for conda (for Psi4 <= 1.7):
-1. Create conda environment
-```
-conda create -n radonpy python=3.9
-conda activate radonpy
-```
 
-2. Installation of requirement packages by conda
-```
-conda install -c psi4 -c conda-forge rdkit psi4 resp mdtraj matplotlib
-```
-
-3. Installation of LAMMPS by conda
-```
-conda install -c conda-forge lammps
-```
-
-or manually build from source of [LAMMPS official site](https://www.lammps.org/).
-The preset module of solubility parameters requires to install TALLY package in LAMMPS.
-In this case, the environment variable must be set:
-```
-export LAMMPS_EXEC=<Path-to-LAMMPS-binary>
-```
-
-4. Installation of RadonPy (version 0.2.x)
-```
-pip install radonpy-pypi
-```
-
-or a beta test version of RadonPy can be installed by
-```
-git clone https://github.com/RadonPy/RadonPy.git
-pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
-```
-
-5. (Optional) RadonPy for Bio-polymers (peptides, polysaccharides, water models (tip3p, tip4p, tip5p))
-```
-conda install -c conda-forge ambertools intermol
-```
 
 ### Installation from PyPI
 RadonPy can be also installed by using only pip install. However, this intallation method can not install Psi4.
@@ -149,8 +113,6 @@ MD simulations are available in this installation, but DFT calculations (conform
 	- Checking archivement of equilibrium
 	- Run for non-equilibrium MD (NEMD)
 	- Calculation of physical properties from the MD calculation results
-		- Thermal conductivity
-		- Thermal diffusivity
 		- Density
 		- Cp
 		- Cv
@@ -166,6 +128,8 @@ MD simulations are available in this installation, but DFT calculations (conform
 		- Radius of gyration
 		- End-to-end distance
 		- Nematic order parameter
+		- Thermal conductivity
+		- Thermal diffusivity
 		- Glass transition temperature (Tg)
         - Solubility parameters (Hildebrand, dispersion term, electrostatic term)
         - Cohesive energy density
@@ -226,8 +190,8 @@ The development of RadonPy has been financially supported by the following grant
 - JSPS as the Grant-in-Aid for Scientific Research (C) (Grant Number: 22K11949)
 
 The numerical calculations were conducted on the following supercomputer systems:
-- Fugaku at the RIKEN Center for Computational Science, Kobe, Japan (Project ID: hp210264, hp210213)
-- The supercomputer at the Research Center for Computational Science, Okazaki, Japan (Project ID: 21-IMS-C126, 22-IMS-C125, 23-IMS-C113, 24-IMS-C107, 25-IMS-C107)
+- Fugaku at the RIKEN Center for Computational Science, Kobe, Japan (Project ID: hp210264, hp210213, hp220179, hp230190, hp240216, hp250235, hp250324, hp260172, hp260195)
+- The supercomputer at the Research Center for Computational Science, Okazaki, Japan (Project ID: 21-IMS-C126, 22-IMS-C125, 23-IMS-C113, 24-IMS-C107, 25-IMS-C107, 26-ISM-C098)
 - The supercomputer Ohtaka at the Supercomputer Center, the Institute for Solid State Physics, the University of Tokyo, Tokyo, Japan
 - The supercomputer TSUBAME3.0 at the Tokyo Institute of Technology, Tokyo, Japan
 - The supercomputer ABCI at the National Institute of Advanced Industrial Science and Technology, Tsukuba, Japan
@@ -236,7 +200,7 @@ The experimental varidation data was provided by:
 - PoLyInfo \[[Link](https://polymer.nims.go.jp/)\] developed by National Institute for Materials Science (NIMS)
 
 ## Copyright and licence
-©Copyright 2025 The RadonPy developers, all rights reserved.
+©Copyright 2026 The RadonPy developers, all rights reserved.
 Released under the `BSD-3 license`.
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 #  Author: Ryohei Hosoya, Hidemine Furuya @ Institute of Science Tokyo
@@ -29,8 +29,9 @@ from .. import lammps
 from . import eq, tc
 from ..md import MD
 
-from pkg_resources import parse_version
-utilbool = parse_version(utils.__version__) >= parse_version('0.2.8')
+# from pkg_resources import parse_version
+# utilbool = parse_version(utils.__version__) >= parse_version('0.2.8')
+utilbool = True
 
 ef_dp_avail = True
 try:

@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -15,7 +15,7 @@ from rdkit import Geometry as Geom
 from ..core import utils, const, calc
 from .qm_wrapper import QMw
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='charge', qm_solver='psi4',
@@ -161,6 +161,7 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
     e_prop['qm_homo'] = psi4mol.homo
     e_prop['qm_lumo'] = psi4mol.lumo
     e_prop['qm_dipole_x'], e_prop['qm_dipole_y'], e_prop['qm_dipole_z'] = psi4mol.dipole
+    e_prop['qm_dipole'] = np.sqrt(e_prop['qm_dipole_x']**2 + e_prop['qm_dipole_y']**2 + e_prop['qm_dipole_z']**2)
 
     del psi4mol
     gc.collect()
@@ -413,11 +414,11 @@ def polar_sos(res, wavelength=None):
     return alpha, tensor
 
 
-def polarizability_sos(mol, wavelength=None, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='polarizability_sos', qm_solver='psi4',
+def polarizability_sos(mol, wavelength=None, confId=0, opt=True, work_dir=None, save_dir=None, tmp_dir=None, log_name='polarizability_sos', qm_solver='psi4',
         opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'},
         geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
         td_method='cam-b3lyp-d3bj', td_basis='6-311+G(2d,p)', td_basis_gen={'Br': '6-311G(d,p)', 'I': 'lanl2dz'},
-        n_state=1000, p_state=None, tda=False, tdscf_maxiter=60, td_output='polarizability_sos_tddft.json',
+        n_state=1000, p_state=0.003, tda=False, tdscf_maxiter=60, td_output='polarizability_sos_tddft.json',
         total_charge=None, total_multiplicity=None, **kwargs):
     """
     sim.qm.polarizability_sos
@@ -522,7 +523,7 @@ def polarizability_sos(mol, wavelength=None, confId=0, opt=True, work_dir=None, 
             del r['LEFT EIGENVECTOR BETA']
             json_data['Excitation state %i' % (i+1)] = r
 
-        with open(os.path.join(work_dir, td_output), 'w') as fh:
+        with open(os.path.join(save_dir, td_output), 'w') as fh:
             json.dump(json_data, fh, ensure_ascii=False, indent=4, separators=(',', ': '))
 
     del psi4mol
