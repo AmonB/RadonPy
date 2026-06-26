@@ -29,9 +29,11 @@ if __name__ == '__main__':
     omp = int(os.environ.get('RadonPy_OMP', 1))
     mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
     gpu = int(os.environ.get('RadonPy_GPU', 0))
+    intel = os.environ.get('RadonPy_LAMMPS_INTEL', 'auto')
+    opt = os.environ.get('RadonPy_LAMMPS_OPT', 'auto')
+    rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    rst_data_file = os.environ.get('RadonPy_LAMMPS_Data_File', None)
-    tc_force = os.environ.get('RadonPy_TC_Force', False)
+    tc_force = bool(os.environ.get('RadonPy_TC_Force', False) == 'True')
 
 
     work_dir = './%s' % data['DBID']
@@ -43,12 +45,12 @@ if __name__ == '__main__':
     if not data['do_TC'] and not tc_force:
         sys.exit(0)
 
-    # Load pickle file or LAMMPS data file
-    mol = io.load_md_obj(rst_pickle_file=rst_pickle_file)
+    # Load JSON file, pickle file, or LAMMPS data file
+    mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
 
     # Non-equilibrium MD for thermal condultivity
     nemd = tc.NEMD_MP(mol, work_dir=work_dir)
-    mol = nemd.exec(decomp=True, temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu)
+    mol = nemd.exec(decomp=True, temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu, intel=intel, opt=opt)
     nemd_analy = nemd.analyze()
     TC = nemd_analy.calc_tc(decomp=True, save=True)
 

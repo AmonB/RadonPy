@@ -28,7 +28,7 @@ if __name__ == '__main__':
         'smiles_ter_1': os.environ.get('RadonPy_SMILES_TER', '*C'),
         'ter_ID_1': os.environ.get('RadonPy_TER_ID', 'CH3'),
         'smiles_ter_2': os.environ.get('RadonPy_SMILES_TER2', None),
-        'ter_ID_2': os.environ.get('RadonPy_TER_ID', None),
+        'ter_ID_2': os.environ.get('RadonPy_TER_ID2', None),
         'qm_method': os.environ.get('RadonPy_QM_Method', 'wb97m-d3bj'),
         'charge': os.environ.get('RadonPy_Charge', 'RESP'),
         'qm_td_method': os.environ.get('RadonPy_QM_TD_Method', 'cam-b3lyp-d3bj'),

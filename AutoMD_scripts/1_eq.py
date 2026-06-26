@@ -52,6 +52,8 @@ if __name__ == '__main__':
     omp = int(os.environ.get('RadonPy_OMP', 1))
     mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
     gpu = int(os.environ.get('RadonPy_GPU', 0))
+    intel = os.environ.get('RadonPy_LAMMPS_INTEL', 'auto')
+    opt = os.environ.get('RadonPy_LAMMPS_OPT', 'auto')
     retry_eq = int(os.environ.get('RadonPy_RetryEQ', 0))
 
 
@@ -195,7 +197,7 @@ if __name__ == '__main__':
 
     # Equilibration MD
     eqmd = eq.EQ21step(ac, work_dir=work_dir)
-    ac = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu)
+    ac = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu, intel=intel, opt=opt)
     analy = eqmd.analyze()
     prop_data = analy.get_all_prop(temp=data['temp'], press=data['press'], save=True)
     result = analy.check_eq()
@@ -204,7 +206,7 @@ if __name__ == '__main__':
     for i in range(retry_eq):
         if result: break
         eqmd = eq.Additional(ac, work_dir=work_dir)
-        ac = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu)
+        ac = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu, intel=intel, opt=opt)
         analy = eqmd.analyze()
         prop_data = analy.get_all_prop(temp=data['temp'], press=data['press'], save=True)
         result = analy.check_eq()
