@@ -33,8 +33,8 @@ if __name__ == '__main__':
     mpi = 16 # mpi should always be 16, 64 or 128 for rerun.
     #mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
     gpu = int(os.environ.get('RadonPy_GPU', 0))
+    rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    rst_data_file = os.environ.get('RadonPy_LAMMPS_Data_File', None)
     
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     data = io.load_md_csv(data)
 
     # Load JSON file, pickle file, or LAMMPS data file
-    mol = io.load_md_obj(rst_pickle_file=rst_pickle_file)
+    mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
 
     # SP calculation (using rerun)
     spmd = sp.Rerun(mol, work_dir=work_dir)

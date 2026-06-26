@@ -27,9 +27,10 @@ if __name__ == '__main__':
     omp = int(os.environ.get('RadonPy_OMP', 0))
     mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
     gpu = int(os.environ.get('RadonPy_GPU', 0))
+    intel = os.environ.get('RadonPy_LAMMPS_INTEL', 'off')
+    opt = os.environ.get('RadonPy_LAMMPS_OPT', 'off')
+    rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    rst_data_file = os.environ.get('RadonPy_LAMMPS_Data_File', None)
-    tg_dump = os.environ.get('RadonPy_TG_Dump', False)
     
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
@@ -38,12 +39,12 @@ if __name__ == '__main__':
     # Load results.csv or input_data.csv file
     data = io.load_md_csv(data)
 
-    # Load pickle file or LAMMPS data file
-    mol = io.load_md_obj(rst_pickle_file=rst_pickle_file)
+    # Load JSON file, pickle file, or LAMMPS data file
+    mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
 
     # Tg calculation
     tgmd = tg.TGMD(mol, work_dir=work_dir)
-    mol, tg_results = tgmd.exec(temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=8e3, intel='off', opt='off')
+    mol, tg_results = tgmd.exec(temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=8e3, intel=intel, opt=opt)
 
     # Reload MD csv data
     data = io.load_md_csv(data)

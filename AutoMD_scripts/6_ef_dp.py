@@ -31,27 +31,28 @@ if __name__ == '__main__':
         'preset_ef_dp_ver': ef_dp.__version__,
     }
 
-    freq = float(os.environ.get('electric_field_freq', 50.0*1e+9))    # unit: Hz
-    axis = os.environ.get('electric_field_axis', 'z')
+    freq = float(os.environ.get('RadonPy_EFDP_Freq', 50.0*1e+9))    # unit: Hz
+    axis = os.environ.get('RadonPy_EFDP_EField_Axis', 'z')
 
-    tuning_maxe = float(os.environ.get('tuning_max_EField', 1.0))    # unit: V/angstrom
-    tuning_rate = float(os.environ.get('tuning_rate', 2.0e-7))    # unit: V/angstrom/fs
-    tuning_plot = os.environ.get('tuning_plot', 'False') == 'True'
-    wave_num = int(os.environ.get('number_of_waves', 10))
-    efield = os.environ.get('electric_field_value', 'auto')
+    tuning_maxe = float(os.environ.get('RadonPy_EFDP_Tuning_Max_EField', 1.0))    # unit: V/angstrom
+    tuning_rate = float(os.environ.get('RadonPy_EFDP_Tuning_Rate', 2.0e-7))    # unit: V/angstrom/fs
+    tuning_plot = bool(os.environ.get('RadonPy_EFDP_Tuning_Plot', False) == 'True')
+    wave_num = int(os.environ.get('RadonPy_EFDP_Number_of_Waves', 10))
+    efield = os.environ.get('RadonPy_EFDP_EField_Value', 'auto')
     if efield == "auto":
         evalue = tuning_maxe
     else:
         evalue = [float(i) for i in efield.split(',')]
-    ef_ensemble = os.environ.get('ef_ensemble', 'npt')
+    ef_ensemble = os.environ.get('RadonPy_EFDP_Ensemble', 'npt')
 
     omp = int(os.environ.get('RadonPy_OMP', 0))
     mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
     gpu = int(os.environ.get('RadonPy_GPU', 0))
     intel = os.environ.get('RadonPy_LAMMPS_INTEL', 'auto')
     opt = os.environ.get('RadonPy_LAMMPS_OPT', 'auto')
+    rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    dp_force = os.environ.get('RadonPy_DP_Force', 'False') == 'True'
+    dp_force = bool(os.environ.get('RadonPy_DP_Force', False) == 'True')
     
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
@@ -60,8 +61,8 @@ if __name__ == '__main__':
     # Load results.csv or input_data.csv file
     data = io.load_md_csv(data)
 
-    # Load pickle file or LAMMPS data file
-    mol = io.load_md_obj(rst_pickle_file=rst_pickle_file)
+    # Load JSON file, pickle file, or LAMMPS data file
+    mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
 
     if not data['check_eq'] and not dp_force:
         print('check_eq: FALSE')

@@ -31,11 +31,13 @@ if __name__ == '__main__':
     omp = int(os.environ.get('RadonPy_OMP', 1))
     mpi = int(os.environ.get('RadonPy_MPI', utils.cpu_count()))
     gpu = int(os.environ.get('RadonPy_GPU', 0))
+    intel = os.environ.get('RadonPy_LAMMPS_INTEL', 'auto')
+    opt = os.environ.get('RadonPy_LAMMPS_OPT', 'auto')
     retry_eq = int(os.environ.get('RadonPy_RetryEQ', 2))
     retry_eq = 2 if retry_eq == 0 else retry_eq
+    rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    rst_data_file = os.environ.get('RadonPy_LAMMPS_Data_File', None)
-    skip_init_analy = bool(int(os.environ.get('RadonPy_Skip_Init_Analy', 0)))
+    skip_init_analy = bool(os.environ.get('RadonPy_Skip_Init_Analy', False) == 'True')
 
 
     work_dir = './%s' % data['DBID']
@@ -45,8 +47,8 @@ if __name__ == '__main__':
     # Load results.csv or input_data.csv file
     data = io.load_md_csv(data)
 
-    # Load pickle file or LAMMPS data file
-    mol = io.load_md_obj(rst_pickle_file=rst_pickle_file)
+    # Load JSON file, pickle file, or LAMMPS data file
+    mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
 
     # Analyze the results of equilibrium MD
     if skip_init_analy:
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     for i in range(retry_eq):
         if result: break
         eqmd = eq.Additional(mol, work_dir=work_dir)
-        mol = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu)
+        mol = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu, intel=intel, opt=opt)
         analy = eqmd.analyze()
         analy.pdb_file = os.path.join(work_dir, 'eq1.pdb')
         prop_data = analy.get_all_prop(temp=data['temp'], press=data['press'], save=True)
