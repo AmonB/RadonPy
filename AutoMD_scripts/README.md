@@ -227,6 +227,8 @@ These scripts have been used in the data generation for our database project. Ca
 | dielectric_const_dc | Static dielectric constant - 1 + refractive index^2 |
 | nematic_order_parameter | Orientational order parameter of the repeating unit or molecule |
 | refractive_index | Refractive index |
+|  |  |
+|  | **Columns of the results of 3_tc.py** |
 | thermal_conductivity | Thermal conductivity (unit: W/(m K)) |
 | thermal_diffusivity | Thermal diffusivity (unit: m^2/s) |
 | TC_ke | Component decomposition of thermal conductivity: kinetic energy term (unit: W/(m K)) |
@@ -237,6 +239,8 @@ These scripts have been used in the data generation for our database project. Ca
 | TC_dihed | Component decomposition of thermal conductivity: dihedral term (unit: W/(m K)) |
 | TC_improper | Component decomposition of thermal conductivity: improper term (unit: W/(m K)) |
 | TC_kspace | Component decomposition of thermal conductivity: long-range electrostatic term (unit: W/(m K)) |
+|  |  |
+|  | **Columns of the results of 4_tg.py** |
 | preset_tg_ver | Version of the equilibration preset used |
 | tg_next_temp |  |
 | tg_init_density |  |
@@ -251,12 +255,27 @@ These scripts have been used in the data generation for our database project. Ca
 | tg_thermal_expansion_intercept(upper_tg) |  |
 | tg_thermal_expansion_coef(below_tg) |  |
 | tg_thermal_expansion_intercept(below_tg) |  |
+|  |  |
+|  | **Columns of the results of 5_sp.py** |
 | sp_ced | Cohesive energy density (unit: J cm^-3) |
 | sp_total | Hildebrand solubility parameter (unit: MPa^0.5) |
 | sp_vdw |Dispersion-force contribution to the solubility parameter (unit: MPa^0.5) |
 | sp_ele | Electrostatic interaction contribution to the solubility parameter, corresponding to the sum of the polar and hydrogen-bonding contributions in the Hansen solubility parameters (unit: MPa^0.5) |
 | sp_ele_short | Short-range component of the electrostatic interaction contribution to the solubility parameter, calculated as the pairwise Coulomb interaction term in the MD calculation (unit: MPa^0.5) |
 | sp_ele_long | Long-range component of the electrostatic interaction contribution to the solubility parameter, calculated using PPPM in the MD calculation (unit: MPa^0.5) |
-
-
+|  |  |
+|  | **Columns of the results of 6_ef_dp.py** |
+| ef_dp_dynamic_dielectric_constant_10GHz_z | Dynamic dielectric constat. The real part of complex permittivity without any corrections. (value of frequency (10GHz) and axis of direction of electric field (x) depend on input.) |
+| ef_dp_dynamic_dielectric_constant_corr_10GHz_z | Dynamic dielectric constat. The real part of complex permittivity with a correction by + refractive index**2 - 1. |
+| ef_dp_dielectric_loss_10GHz_z | Dielectric loss. Imaginary part of complex permittivity. |
+| ef_dp_loss_tangent_10GHz_z | Dielectric loss tangent which is calculated by (ef_dp_dielectric_loss_10GHz_z) / (ef_dp_dynamic_dielectric_constant_corr_10GHz_z) |
+| ef_dp_efield_10GHz_z | Applied maximum electric field value in the alternating electric field applied MD. |
+| ef_dp_tuning_max_EField_10GHz_z | Applied maximum electric field value in the tuning stage |
+| ef_dp_tuning_rate_10GHz_z | Increasing rate of electric field value in the tuning rate |
+| ef_dp_nwave_10GHz_z | Input value of number of waves, which defines number of simulation timestep, in the alternating electric field applied MD. |
+| ef_dp_D0_10GHz_z | Parameters of curve fitting results in the alternating electric field applied MD. |
+| ef_dp_delta_10GHz_z | Parameters of curve fitting results in the alternating electric field applied MD. |
+| ef_dp_r2_10GHz_z | R^2 of difference between raw simulated data and fitting curve. |
+| ef_dp_rmspe_10GHz_z | RMSPE (Root Mean Squared Percentage Error) of difference between raw simulated data and fitting curve. |
+| ef_dp_remarks_10GHz_z | Remarks about results of preset.ef_dp |
 
