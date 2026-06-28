@@ -249,6 +249,7 @@ class further_Additional(eq.Equilibration):
 
         if props is not None and 'refractive_index' in props.keys():
             r_perm_corr = r_perm + props['refractive_index']**2 - 1
+            l_tan = i_perm / r_perm_corr
             remarks = None
         else:
             r_perm_corr = None
