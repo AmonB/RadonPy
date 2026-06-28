@@ -31,7 +31,7 @@ if __name__ == '__main__':
         'preset_ef_dp_ver': ef_dp.__version__,
     }
 
-    freq = float(os.environ.get('RadonPy_EFDP_Freq', 50.0*1e+9))    # unit: Hz
+    freq = float(os.environ.get('RadonPy_EFDP_Freq', 10.0*1e+9))    # unit: Hz
     axis = os.environ.get('RadonPy_EFDP_EField_Axis', 'z')
 
     tuning_maxe = float(os.environ.get('RadonPy_EFDP_Tuning_Max_EField', 1.0))    # unit: V/angstrom
