@@ -12,6 +12,7 @@ matplotlib.use('Agg')
 import pandas as pd
 import os
 import math
+import sys
 
 # For user installed LAMMPS
 # from radonpy.core import const
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     opt = os.environ.get('RadonPy_LAMMPS_OPT', 'auto')
     rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    dp_force = bool(os.environ.get('RadonPy_DP_Force', False) == 'True')
+    dp_force = bool(os.environ.get('RadonPy_EFDP_Force', False) == 'True')
     
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
