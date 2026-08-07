@@ -46,5 +46,7 @@ export RadonPy_GPU=0
 # export RadonPy_Monomer_Dir=/path/to/directory/of/repeating_unit/file
 # export RadonPy_Ter_Dir=/path/to/directory/of/terminating_group/file
 # export RadonPy_RetryEQ=0
+# export RadonPy_No_Traj='True'
+# export RadonPy_Del_Traj='True'
 
 python3 /path/to/AutoMD_scripts/1_eq.py

@@ -751,8 +751,10 @@ class LAMMPS():
             indata.append('fix md0 %s nve' % all_nowater)
             indata.append('run 0')
 
-        indata.append('')
-        indata.append('write_dump all custom %s id x y z xu yu zu vx vy vz fx fy fz modify sort id' % (md.outstr))
+        if md.outstr:
+            indata.append('')
+            indata.append('write_dump all custom %s id x y z xu yu zu vx vy vz fx fy fz modify sort id' % (md.outstr))
+            
         if md.write_data:
 # CL modification **************************************************
             indata.append('')

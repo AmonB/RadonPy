@@ -20,15 +20,19 @@ __version__ = '1.0b2'
 
 
 class NEMD_MP(preset.Preset):
-    def __init__(self, mol, axis='x', prefix='', work_dir=None, save_dir=None, solver_path=None, **kwargs):
+    def __init__(self, mol, axis='x', prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj=False, **kwargs):
         super().__init__(mol, prefix=prefix, work_dir=work_dir, save_dir=save_dir, solver_path=solver_path, **kwargs)
         self.axis = axis
         self.dat_file = kwargs.get('dat_file', '%snemd_TC-MP_%s.data' % (prefix, axis))
         self.pdb_file = kwargs.get('pdb_file', '%snemd_TC-MP_%s.pdb' % (prefix, axis))
         self.in_file = kwargs.get('in_file', '%snemd_TC-MP_%s.in' % (prefix, axis))
         self.log_file = kwargs.get('log_file', '%snemd_TC-MP_%s.log' % (prefix, axis))
-        self.dump_file = kwargs.get('dump_file', '%snemd_TC-MP_%s.dump' % (prefix, axis))
-        self.xtc_file = kwargs.get('xtc_file', '%snemd_TC-MP_%s.xtc' % (prefix, axis))
+        if no_traj:
+            self.dump_file = kwargs.get('dump_file')
+            self.xtc_file = kwargs.get('xtc_file')
+        else:
+            self.dump_file = kwargs.get('dump_file', '%snemd_TC-MP_%s.dump' % (prefix, axis))
+            self.xtc_file = kwargs.get('xtc_file', '%snemd_TC-MP_%s.xtc' % (prefix, axis))
         self.rst1_file = kwargs.get('rst1_file', '%snemd_TC-MP_%s_1.rst' % (prefix, axis))
         self.rst2_file = kwargs.get('rst2_file', '%snemd_TC-MP_%s_2.rst' % (prefix, axis))
         self.tprof_file = kwargs.get('tprof_file', '%sslabtemp_%s.profile' % (prefix, axis))
@@ -283,9 +287,11 @@ compute         layers all chunk/atom bin/1d ${axis} lower ${invslab} units redu
 fix             2 all ave/chunk ${Nevery} ${Nfreq} ${exchg} layers temp density/mass file ${Tprof} norm sample
 
 # Output
-dump            1 all custom 1000 ${dumpf} id type mol xs ys zs ix iy iz
-dump            2 all xtc 1000 ${xtcf}
-dump_modify     2 unwrap yes
+if "${dumpf} != None" then &
+    "dump            1 all custom 1000 ${dumpf} id type mol xs ys zs ix iy iz"
+if "${xtcf} != None" then &    
+    "dump            2 all xtc 1000 ${xtcf}" &
+    "dump_modify     2 unwrap yes"
 restart         100000 ${rstf1} ${rstf2}
 
 variable        heatflux   equal   (f_mp*${kcal2j}/${NA})/(2*${Jarea}*${ang2m}*${ang2m})   # J/m^2 = Ws/m^2
@@ -457,7 +463,7 @@ quit
             tprof_file = os.path.join(self.work_dir, self.tprof_file),
             lJprof_file  = os.path.join(self.work_dir, self.lJprof_file),
             rJprof_file  = os.path.join(self.work_dir, self.rJprof_file),
-            traj_file = os.path.join(self.work_dir, self.xtc_file),
+            traj_file = os.path.join(self.work_dir, self.xtc_file) if self.xtc_file is not None else None,
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
             dat_file  = os.path.join(self.work_dir, self.dat_file),
             ignore_log = ignore_log,
@@ -966,9 +972,11 @@ compute         layers all chunk/atom bin/1d ${axis} lower ${invslab} units redu
 fix             2 all ave/chunk ${Nevery} ${Nfreq} ${exchg} layers temp file ${Tprof} norm sample
 
 # Output
-dump            1 all custom 1000 ${dumpf} id type mol xs ys zs ix iy iz
-dump            2 all xtc 1000 ${xtcf}
-dump_modify     2 unwrap yes
+if "${dumpf} != None" then &
+    "dump            1 all custom 1000 ${dumpf} id type mol xs ys zs ix iy iz"
+if "${xtcf} != None" then &
+    "dump            2 all xtc 1000 ${xtcf}" &
+    "dump_modify     2 unwrap yes"
 restart         100000 ${rstf1} ${rstf2}
 
 variable        heatflux   equal   (f_mp*${kcal2j}/${NA})/(2*${Jarea}*${ang2m}*${ang2m})   # J/m^2 = Ws/m^2
@@ -1135,15 +1143,19 @@ quit
 
 
 class NEMD_Langevin(preset.Preset):
-    def __init__(self, mol, axis='x', prefix='', work_dir=None, save_dir=None, solver_path=None, **kwargs):
+    def __init__(self, mol, axis='x', prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj=False, **kwargs):
         super().__init__(mol, prefix=prefix, work_dir=work_dir, save_dir=save_dir, solver_path=solver_path, **kwargs)
         self.axis = axis
         self.dat_file = kwargs.get('dat_file', '%snemd_TC-Langevin_%s.data' % (prefix, axis))
         self.pdb_file = kwargs.get('pdb_file', '%snemd_TC-Langevin_%s.pdb' % (prefix, axis))
         self.in_file = kwargs.get('in_file', '%snemd_TC-Langevin_%s.in' % (prefix, axis))
         self.log_file = kwargs.get('log_file', '%snemd_TC-Langevin_%s.log' % (prefix, axis))
-        self.dump_file = kwargs.get('dump_file', '%snemd_TC-Langevin_%s.dump' % (prefix, axis))
-        self.xtc_file = kwargs.get('xtc_file', '%snemd_TC-Langevin_%s.xtc' % (prefix, axis))
+        if no_traj:
+            self.dump_file = kwargs.get('dump_file')
+            self.xtc_file = kwargs.get('xtc_file')
+        else:
+            self.dump_file = kwargs.get('dump_file', '%snemd_TC-Langevin_%s.dump' % (prefix, axis))
+            self.xtc_file = kwargs.get('xtc_file', '%snemd_TC-Langevin_%s.xtc' % (prefix, axis))
         self.rst1_file = kwargs.get('rst1_file', '%snemd_TC-Langevin_%s_1.rst' % (prefix, axis))
         self.rst2_file = kwargs.get('rst2_file', '%snemd_TC-Langevin_%s_2.rst' % (prefix, axis))
         self.tprof_file = kwargs.get('tprof_file', '%sslabtemp_%s.profile' % (prefix, axis))
@@ -1405,9 +1417,11 @@ compute         layers all chunk/atom bin/1d ${axis} lower ${invslab} units redu
 fix             1 all ave/chunk ${Nevery} ${Nfreq} ${avetime} layers v_temp density/mass norm all ave one file ${Tprof}
 
 # Output
-dump            1 all custom 1000 ${dumpf} id type mol xs ys zs ix iy iz
-dump            2 all xtc 1000 ${xtcf}
-dump_modify     2 unwrap yes
+if "${dumpf} != None" then &
+    "dump            1 all custom 1000 ${dumpf} id type mol xs ys zs ix iy iz"
+if "${xtcf} != None" then &
+    "dump            2 all xtc 1000 ${xtcf}" &
+    "dump_modify     2 unwrap yes"
 restart         100000 ${rstf1} ${rstf2}
 
 variable        heatfin   equal   (f_langin*${kcal2j}/${NA})/(${Jarea}*${ang2m}*${ang2m})   # J/m^2 = Ws/m^2
@@ -1547,7 +1561,7 @@ quit
             log_file  = os.path.join(self.work_dir, self.log_file),
             tprof_file = os.path.join(self.work_dir, self.tprof_file),
             JDprof_file  = os.path.join(self.work_dir, self.JDprof_file),
-            traj_file = os.path.join(self.work_dir, self.xtc_file),
+            traj_file = os.path.join(self.work_dir, self.xtc_file) if self.xtc_file is not None else None,
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
             dat_file  = os.path.join(self.work_dir, self.dat_file),
             ignore_log = ignore_log,
@@ -1768,15 +1782,19 @@ class NEMD_Langevin_Analyze(lammps.Analyze):
 
 
 class EMD_GK(preset.Preset):
-    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, **kwargs):
+    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj=False, **kwargs):
         super().__init__(mol, prefix=prefix, work_dir=work_dir, save_dir=save_dir, solver_path=solver_path, **kwargs)
 
         self.dat_file = kwargs.get('dat_file', 'emd_TC-GK.data')
         self.pdb_file = kwargs.get('pdb_file', 'emd_TC-GK.pdb')
         self.in_file = kwargs.get('in_file', 'emd_TC-GK.in')
         self.log_file = kwargs.get('log_file', 'emd_TC-GK.log')
-        self.dump_file = kwargs.get('dump_file', 'emd_TC-GK.dump')
-        self.xtc_file = kwargs.get('xtc_file', 'emd_TC-GK.xtc')
+        if no_traj:
+            self.dump_file = kwargs.get('dump_file')
+            self.xtc_file = kwargs.get('xtc_file')
+        else:
+            self.dump_file = kwargs.get('dump_file', 'emd_TC-GK.dump')
+            self.xtc_file = kwargs.get('xtc_file', 'emd_TC-GK.xtc')
         self.rst1_file = kwargs.get('rst1_file', 'emd_TC-GK_1.rst')
         self.rst2_file = kwargs.get('rst2_file', 'emd_TC-GK_2.rst')
         self.kappa_file = kwargs.get('kappa_file', 'emd_TC-GK_kappa.profile')
@@ -1963,9 +1981,11 @@ fix             kappa     all ave/time ${kpdump} 1 ${kpdump} v_kappaxx v_kappayy
 fix             NVT1 %s nvt temp ${Ttemp} ${Ttemp} 100
 
 # Output
-dump            1 all custom 1000 ${dumpf} id type mol x y z vx vy vz
-dump            2 all xtc 1000 ${xtcf}
-dump_modify     2 unwrap yes
+if "${dumpf} != None" then &
+    "dump            1 all custom 1000 ${dumpf} id type mol x y z vx vy vz"
+if "${xtcf} != None" then &
+    "dump            2 all xtc 1000 ${xtcf}" &
+    "dump_modify     2 unwrap yes"
 restart         100000 ${rstf1} ${rstf2}
 
 thermo_style    custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz v_kpJx v_kpJy v_kpJz
@@ -1993,7 +2013,7 @@ quit
 
         anal = lammps.Analyze(
             log_file  = os.path.join(self.work_dir, self.log_file),
-            traj_file = os.path.join(self.work_dir, self.xtc_file),
+            traj_file = os.path.join(self.work_dir, self.xtc_file) if self.xtc_file is not None else None,
             pdb_file  = os.path.join(self.work_dir, self.pdb_file),
             dat_file  = os.path.join(self.work_dir, self.dat_file),
             ignore_log = ignore_log,

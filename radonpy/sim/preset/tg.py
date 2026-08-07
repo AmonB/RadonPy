@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 #  Author: Hiroki Sugisawa @ Mitsubishi Chemical Corp.
@@ -20,11 +20,11 @@ from ..md import MD
 
 from matplotlib import pyplot as plt
 
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 
 class EQMD(preset.Preset):
-    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, **kwargs):
+    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj=True, **kwargs):
         """
         preset.eq.Equilibration
 
@@ -59,8 +59,12 @@ class EQMD(preset.Preset):
         self.dat_file    = kwargs.get('dat_file',    '%stg.data' % self.prefix)
         self.pickle_file = kwargs.get('pickle_file', '%stg.pickle' % self.prefix)
         self.json_file   = kwargs.get('json_file',   '%stg.json' % self.prefix)
-        self.dump_file   = kwargs.get('dump_file',   '%stg.dump' % self.prefix)
-        self.xtc_file    = kwargs.get('xtc_file',    '%stg.xtc' % self.prefix)
+        if no_traj:
+            self.dump_file   = kwargs.get('dump_file')
+            self.xtc_file    = kwargs.get('xtc_file')
+        else:
+            self.dump_file   = kwargs.get('dump_file',   '%stg.dump' % self.prefix)
+            self.xtc_file    = kwargs.get('xtc_file',    '%stg.xtc' % self.prefix)
         self.restart_file= kwargs.get('restart_file','%stg.rst' % self.prefix)    
         self.rg_file     = kwargs.get('rg_file',     '%stg.profile' % self.prefix)
         
@@ -132,10 +136,10 @@ class EQMD(preset.Preset):
         md.dihedral_style = self.dihedral_style
         md.improper_style = self.improper_style
         md.neighbor = '%s bin' % self.neighbor_dis
-#        md.dump_freq = kwargs.get('dump_freq',  1e10)
-        md.dump_file = None
-        md.xtc_file = None
+        md.dump_file = self.dump_file
+        md.xtc_file = self.xtc_file
         md.thermo_freq = 100 if int(step/1000)<100 else int(step/1000) if int(step/1000)<1000 else 1000
+        md.dump_freq = md.thermo_freq
         md.log_file = kwargs.get('log_file',    self.log_file)
         md.dat_file = kwargs.get('eq_dat_file', self.eq_dat_file)
         
@@ -171,9 +175,8 @@ class EQMD(preset.Preset):
         md.dihedral_style = self.dihedral_style
         md.improper_style = self.improper_style
         md.neighbor = '%s bin' % self.neighbor_dis
-#        md.dump_freq = kwargs.get('dump_freq',  1e10)
-        md.dump_file = None
-        md.xtc_file = None
+        md.dump_file = self.dump_file
+        md.xtc_file = self.xtc_file
         md.thermo_freq = 100 if int(step/1000)<100 else int(step/1000) if int(step/1000)<1000 else 1000
         md.log_file = kwargs.get('log_file',    self.log_file)
         md.dat_file = kwargs.get('eq_dat_file', self.eq_dat_file)
@@ -205,9 +208,8 @@ class EQMD(preset.Preset):
         md.dihedral_style = self.dihedral_style
         md.improper_style = self.improper_style
         md.neighbor = '%s bin' % self.neighbor_dis
-#        md.dump_freq = kwargs.get('dump_freq',  1e10)
-        md.dump_file = None
-        md.xtc_file = None
+        md.dump_file = self.dump_file
+        md.xtc_file = self.xtc_file
         md.thermo_freq = 100 if int(step/1000)<100 else int(step/1000) if int(step/1000)<1000 else 1000
         md.log_file = kwargs.get('log_file',    self.log_file)
         md.dat_file = kwargs.get('eq_dat_file', self.eq_dat_file)
@@ -312,9 +314,9 @@ class TGMD_analyze(lammps.Analyze):
                 rmse.append( np.sum( np.square( diff ) ) )
                 tgs.append(  (b2-b1)/(a1-a2) )
             if rmse == []:
-                return 'ERROR'
+                return None
             elif ndata < 20:
-                return 'ERROR'
+                return None
             else:
                 rmse_arg = np.argmin(np.array( rmse ))
                 tg = tgs[rmse_arg]
@@ -348,7 +350,7 @@ class TGMD_analyze(lammps.Analyze):
             data['tg_thermal_expansion_intercept(below_tg)'] = slopes[rmse_arg][3]
             return data
         else:
-            return 'ERROR'
+            return None
         
     def quench():
         print('hello')
@@ -435,7 +437,11 @@ class TGMD(EQMD):
         utils.radon_print('Complete glass transition algorithm (tg). Elapsed time = %s' % str(dt2-dt1), level=1)
         
         result = TGMD_analyze(log_file=os.path.join(self.work_dir_tg, self.log_file), save_dir=self.save_dir).step_wise()
-        self.data.update(result)
+
+        if result is None:
+            utils.radon_print('Tg could not be calculated in TGMD_analyze.', level=3)
+        else:
+            self.data.update(result)
         
         return self.mol, self.data
 

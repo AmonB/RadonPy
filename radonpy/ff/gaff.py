@@ -626,7 +626,7 @@ class GAFF():
 
     def assign_btypes_bond(self, b):
         """
-        GAFF.assign_btypes
+        GAFF.assign_btypes_bond
 
         GAFF specific bond typing rules for a bond.
 

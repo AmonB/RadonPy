@@ -40,5 +40,6 @@ export RadonPy_EFDP_Freq=50.0*1e+9    # unit: Hz
 # export RadonPy_JSON_File=''
 # export RadonPy_Pickle_File=''
 # export RadonPy_EFDP_Force='False'
+# export RadonPy_No_Traj='True'
 
 python3 /path/to/AutoMD_scripts/6_ef_dp.py

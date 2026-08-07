@@ -11,6 +11,16 @@ matplotlib.use('Agg')
 
 import pandas as pd
 import os
+import sys
+
+# For Fugaku
+# from radonpy.core import const
+# const.mpi_cmd = 'mpiexec -n %i'
+# const.check_package_disable = True
+# const.lammps_exec = '/vol0003/hp210264/data/radonpy/lammps/lmp_tuned'
+# os.environ['RadonPy_LAMMPS_INTEL'] = 'off'
+# os.environ['RadonPy_LAMMPS_OPT'] = 'off'
+# os.environ['RadonPy_No_Traj'] = str(os.environ.get('RadonPy_No_Traj', 'True'))
 
 from radonpy.core import utils
 from radonpy.sim import helper
@@ -31,19 +41,24 @@ if __name__ == '__main__':
     opt = os.environ.get('RadonPy_LAMMPS_OPT', 'off')
     rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    
+    tg_force = bool(os.environ.get('RadonPy_Tg_Force', False) == 'True')
+    no_traj = bool(os.environ.get('RadonPy_No_Traj', False) == 'True')
+
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
     io = helper.IO_Helper(work_dir, save_dir)
     
     # Load results.csv or input_data.csv file
     data = io.load_md_csv(data)
+    if not data['check_eq'] and not tg_force:
+        print('check_eq: FALSE')
+        sys.exit(0)
 
     # Load JSON file, pickle file, or LAMMPS data file
     mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
 
     # Tg calculation
-    tgmd = tg.TGMD(mol, work_dir=work_dir)
+    tgmd = tg.TGMD(mol, work_dir=work_dir, no_traj=no_traj)
     mol, tg_results = tgmd.exec(temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=8e3, intel=intel, opt=opt)
 
     # Reload MD csv data

@@ -726,8 +726,14 @@ class Psi4w():
             # Add c for atoms fixed in second stage
             if LooseVersion(resp.__version__) >= LooseVersion('0.8'):
                 resp.stage2_helper.set_stage2_constraint(pmol, charges1[1], options)
-                options['grid'] = ['./1_%s_grid.dat' % pmol.name()]
-                options['esp'] = ['./1_%s_grid_esp.dat' % pmol.name()]
+                if os.path.isfile('./1_%s_grid.dat' % pmol.name()):
+                    options['grid'] = ['./1_%s_grid.dat' % pmol.name()]
+                else:
+                    options['grid'] = ['./grid.dat']
+                if os.path.isfile('./1_%s_grid_esp.dat' % pmol.name()):
+                    options['esp'] = ['./1_%s_grid_esp.dat' % pmol.name()]
+                else:
+                    options['grid'] = ['./grid_esp.dat']
             else:
                 helper = resp.stage2_helper()
                 helper.set_stage2_constraint(pmol, charges1[1], options)

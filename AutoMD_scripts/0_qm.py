@@ -12,6 +12,12 @@ matplotlib.use('Agg')
 import pandas as pd
 import os
 
+# For Fugaku
+# from radonpy.core import const
+# const.mpi_cmd = 'mpiexec -n %i'
+# const.check_package_disable = True
+# const.lammps_exec = '/vol0003/hp210264/data/radonpy/lammps/lmp_tuned'
+
 from radonpy.core import utils, calc
 from radonpy.ff.gaff import GAFF
 from radonpy.ff.gaff2 import GAFF2
