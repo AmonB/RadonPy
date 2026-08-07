@@ -28,5 +28,7 @@ export RadonPy_GPU=0
 # export RadonPy_TMP_Dir=${TMP_DIR}
 # export RadonPy_JSON_File=''
 # export RadonPy_Pickle_File=''
+# export RadonPy_Tg_Force='False'
+# export RadonPy_No_Traj='True'
 
 python3 /path/to/AutoMD_scripts/4_tg.py

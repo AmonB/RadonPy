@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 
@@ -15,11 +15,11 @@ from ...core import calc, const, utils
 from .. import lammps, preset
 from ..md import MD
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
 
 
 class Equilibration(preset.Preset):
-    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, **kwargs):
+    def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj_ann=False, **kwargs):
         """
         preset.eq.Equilibration
 
@@ -40,11 +40,19 @@ class Equilibration(preset.Preset):
         self.log_file1 = kwargs.get('log_file1', '%seq1.log' % self.prefix)
         self.log_file2 = kwargs.get('log_file2', '%seq2.log' % self.prefix)
         self.log_file = kwargs.get('log_file', '%seq3.log' % self.prefix)
-        self.dump_file1 = kwargs.get('dump_file1', '%seq1.dump' % self.prefix)
-        self.dump_file2 = kwargs.get('dump_file2', '%seq2.dump' % self.prefix)
+        if no_traj_ann:
+            self.dump_file1 = kwargs.get('dump_file1')
+            self.dump_file2 = kwargs.get('dump_file2')
+        else:
+            self.dump_file1 = kwargs.get('dump_file1', '%seq1.dump' % self.prefix)
+            self.dump_file2 = kwargs.get('dump_file2', '%seq2.dump' % self.prefix)
         self.dump_file = kwargs.get('dump_file', '%seq3.dump' % self.prefix)
-        self.xtc_file1 = kwargs.get('xtc_file1', '%seq1.xtc' % self.prefix)
-        self.xtc_file2 = kwargs.get('xtc_file2', '%seq2.xtc' % self.prefix)
+        if no_traj_ann:
+            self.xtc_file1 = kwargs.get('xtc_file1')
+            self.xtc_file2 = kwargs.get('xtc_file2')            
+        else:
+            self.xtc_file1 = kwargs.get('xtc_file1', '%seq1.xtc' % self.prefix)
+            self.xtc_file2 = kwargs.get('xtc_file2', '%seq2.xtc' % self.prefix)
         self.xtc_file = kwargs.get('xtc_file', '%seq3.xtc' % self.prefix)
         self.rg_file = kwargs.get('rg_file', '%srg3.profile' % self.prefix)
         self.last_str1 = kwargs.get('last_str1', '%seq1_last.dump' % self.prefix)
@@ -615,6 +623,30 @@ def get_final_json(save_dir):
             break
 
     return json_file
+
+
+def del_dump(del_dir):
+    del_files = []
+    if os.path.isdir(del_dir):
+        idx = get_final_idx(del_dir)
+        if idx == 0:
+            idx = get_final_idx(os.path.join(del_dir, 'analyze'))
+            if idx == 0:
+                return False
+        last_dump = 'eq%i.dump' % idx
+        last_xtc = 'eq%i.xtc' % idx
+        dump_list = sorted(glob.glob(os.path.join(del_dir, '*.dump')))
+        xtc_list = sorted(glob.glob(os.path.join(del_dir, '*.xtc')))
+        traj_list = dump_list + xtc_list
+        for traj in traj_list:
+            bn = os.path.basename(traj)
+            if '_last.dump' in bn or last_dump == bn or last_xtc == bn:
+                continue
+            else:
+                os.remove(traj)
+                utils.radon_print('%s is deleted' % traj, level=1)
+
+    return True
 
 
 def restore(save_dir, **kwargs):

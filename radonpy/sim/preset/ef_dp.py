@@ -37,7 +37,7 @@ from scipy.optimize import OptimizeWarning
 warnings.simplefilter('ignore', (RuntimeWarning, OptimizeWarning))
 
 class further_Additional(eq.Equilibration):
-    def __init__(self, mol, prefix='', work_dir=None, solver_path=None, idx=0, **kwargs):
+    def __init__(self, mol, prefix='', work_dir=None, solver_path=None, idx=0, no_traj=False, **kwargs):
         
         super().__init__(mol, prefix=prefix, work_dir=work_dir, solver_path=solver_path, **kwargs)
 
@@ -54,8 +54,12 @@ class further_Additional(eq.Equilibration):
             self.dat_file = kwargs.get('dat_file', 'ef_%s_tuning.data' % self.direction)
             self.pdb_file = kwargs.get('pdb_file', 'ef_%s_tuning.pdb' % self.direction)
             self.log_file = kwargs.get('log_file', 'ef_%s_tuning.log' % self.direction)
-            self.dump_file = kwargs.get('dump_file', None)    # 'ef_%s_tuning.dump' % self.direction
-            self.xtc_file = kwargs.get('xtc_file', None)    # 'ef_%s_tuning.xtc' % self.direction
+            if no_traj:
+                self.dump_file = kwargs.get('dump_file')
+                self.xtc_file = kwargs.get('xtc_file')
+            else:
+                self.dump_file = kwargs.get('dump_file', 'ef_%s_tuning.dump' % self.direction)
+                self.xtc_file = kwargs.get('xtc_file', 'ef_%s_tuning.xtc' % self.direction)
             self.last_str = kwargs.get('last_str', 'ef_%s_tuning_last.dump' % self.direction)
             self.last_data = kwargs.get('last_data', 'ef_%s_tuning_last.data' % self.direction)
             self.json_file = kwargs.get('json_file', 'ef_%s_tuning_last.json' % self.direction)
@@ -66,8 +70,12 @@ class further_Additional(eq.Equilibration):
             self.dat_file = kwargs.get('dat_file', 'ef_%sGHz_%sEF_%s.data' % (self.freq_name, self.evalue, self.direction))
             self.pdb_file = kwargs.get('pdb_file', 'ef_%sGHz_%sEF_%s.pdb' % (self.freq_name, self.evalue, self.direction))
             self.log_file = kwargs.get('log_file', 'ef_%sGHz_%sEF_%s.log' % (self.freq_name, self.evalue, self.direction))
-            self.dump_file = kwargs.get('dump_file', 'ef_%sGHz_%sEF_%s.dump' % (self.freq_name, self.evalue, self.direction))
-            self.xtc_file = kwargs.get('xtc_file', 'ef_%sGHz_%sEF_%s.xtc' % (self.freq_name, self.evalue, self.direction))
+            if no_traj:
+                self.dump_file = kwargs.get('dump_file')
+                self.xtc_file = kwargs.get('xtc_file')
+            else:
+                self.dump_file = kwargs.get('dump_file', 'ef_%sGHz_%sEF_%s.dump' % (self.freq_name, self.evalue, self.direction))
+                self.xtc_file = kwargs.get('xtc_file', 'ef_%sGHz_%sEF_%s.xtc' % (self.freq_name, self.evalue, self.direction))
             self.last_str = kwargs.get('last_str', 'ef_%sGHz_%sEF_%s_last.dump' % (self.freq_name, self.evalue, self.direction))
             self.last_data = kwargs.get('last_data', 'ef_%sGHz_%sEF_%s_last.data' % (self.freq_name, self.evalue, self.direction))
             self.json_file = kwargs.get('json_file', 'ef_%sGHz_%sEF_%s_last.json' % (self.freq_name, self.evalue, self.direction))

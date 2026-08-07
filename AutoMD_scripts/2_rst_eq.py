@@ -12,6 +12,16 @@ matplotlib.use('Agg')
 import pandas as pd
 import os
 
+# For Fugaku
+# from radonpy.core import const
+# const.mpi_cmd = 'mpiexec -n %i'
+# const.check_package_disable = True
+# const.lammps_exec = '/vol0003/hp210264/data/radonpy/lammps/lmp_tuned'
+# os.environ['RadonPy_LAMMPS_INTEL'] = 'off'
+# os.environ['RadonPy_LAMMPS_OPT'] = 'off'
+# os.environ['RadonPy_Del_Traj'] = str(os.environ.get('RadonPy_Del_Traj', 'True'))
+
+
 from radonpy.core import utils
 from radonpy.sim import helper
 from radonpy.sim.preset import eq
@@ -38,6 +48,7 @@ if __name__ == '__main__':
     rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
     skip_init_analy = bool(os.environ.get('RadonPy_Skip_Init_Analy', False) == 'True')
+    del_traj = bool(os.environ.get('RadonPy_Del_Traj', False) == 'True')
 
 
     work_dir = './%s' % data['DBID']
@@ -70,6 +81,8 @@ if __name__ == '__main__':
         analy.pdb_file = os.path.join(work_dir, 'eq1.pdb')
         prop_data = analy.get_all_prop(temp=data['temp'], press=data['press'], save=True)
         result = analy.check_eq()
+        if del_traj:
+            eq.del_dump(work_dir)
 
     # Reload MD csv data
     data = io.load_md_csv(data)

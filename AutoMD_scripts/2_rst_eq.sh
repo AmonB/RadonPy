@@ -33,5 +33,6 @@ export RadonPy_GPU=0
 # export RadonPy_JSON_File=''
 # export RadonPy_Pickle_File=''
 export RadonPy_RetryEQ='2'
+# export RadonPy_Del_Traj='True'
 
 python3 /path/to/AutoMD_scripts/2_rst_eq.py

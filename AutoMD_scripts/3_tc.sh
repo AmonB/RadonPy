@@ -32,5 +32,6 @@ export RadonPy_GPU=0
 # export RadonPy_JSON_File=''
 # export RadonPy_Pickle_File=''
 # export RadonPy_TC_Force='False'
+# export RadonPy_No_Traj='True'
 
 python3 /path/to/AutoMD_scripts/3_tc.py

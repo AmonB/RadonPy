@@ -18,6 +18,15 @@ import sys
 # from radonpy.core import const
 # const.lammps_exec = '/path/to/lammps/binary'
 
+# For Fugaku
+# from radonpy.core import const
+# const.mpi_cmd = 'mpiexec -n %i'
+# const.check_package_disable = True
+# const.lammps_exec = '/vol0003/hp210264/data/radonpy/lammps/lmp_tuned'
+# os.environ['RadonPy_LAMMPS_INTEL'] = 'off'
+# os.environ['RadonPy_LAMMPS_OPT'] = 'off'
+# os.environ['RadonPy_No_Traj'] = str(os.environ.get('RadonPy_No_Traj', 'True'))
+
 from radonpy.core import utils
 from radonpy.sim import helper
 from radonpy.sim.preset import ef_dp
@@ -54,7 +63,8 @@ if __name__ == '__main__':
     rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
     dp_force = bool(os.environ.get('RadonPy_EFDP_Force', False) == 'True')
-    
+    no_traj = bool(os.environ.get('RadonPy_No_Traj', False) == 'True')
+
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
     io = helper.IO_Helper(work_dir, save_dir)
@@ -89,7 +99,7 @@ if __name__ == '__main__':
             tuning_freq = round_tuning_time / 5000
 
             # Execute tuning
-            efeq = ef_dp.further_Additional(mol, work_dir=work_dir, axis=direction, evalue=evalue, tuning_rate=tuning_rate, process='tuning')
+            efeq = ef_dp.further_Additional(mol, work_dir=work_dir, axis=direction, evalue=evalue, tuning_rate=tuning_rate, process='tuning', no_traj=no_traj)
             if os.path.isfile(os.path.join(work_dir, 'ef_%s_tuning_last.data' % direction)):
                 utils.radon_print('Tuning data exists.', level=1)
             else:
@@ -100,7 +110,7 @@ if __name__ == '__main__':
             estimated_evalue = round(efeq.tuning(tuning_plot), 2)
 
             # Execute efield-MD
-            efeq = ef_dp.further_Additional(mol, work_dir=work_dir, axis=direction, evalue=estimated_evalue, freq=freq, process='dp')
+            efeq = ef_dp.further_Additional(mol, work_dir=work_dir, axis=direction, evalue=estimated_evalue, freq=freq, process='dp', no_traj=no_traj)
             if os.path.isfile(os.path.join(work_dir, 'ef_%sGHz_%sEF_%s_last.data' % (round(freq/1e+9, 2), estimated_evalue, direction))):
                 utils.radon_print('Calculating permittivity (%s direction, %1.2f V/A)' %(direction, estimated_evalue), level=1)
             else:

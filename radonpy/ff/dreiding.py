@@ -1,4 +1,4 @@
-#  Copyright (c) 2025. RadonPy developers. All rights reserved.
+#  Copyright (c) 2026. RadonPy developers. All rights reserved.
 #  Use of this source code is governed by a BSD-3-style
 #  license that can be found in the LICENSE file.
 #  Author: Teruki Tsurimoto @ Sekisui Chemical Co., Ltd.
@@ -10,13 +10,12 @@ import numpy as np
 import os
 import json
 from itertools import permutations
-from rdkit.Chem import AllChem
 from rdkit import Chem
 from ..core import calc, utils
 from . import ff_class
-from math import sin, cos, pi, acos
 
-__version__ = '1.0b1'
+__version__ = '1.0b2'
+
 
 class Dreiding():
     """
@@ -105,9 +104,9 @@ class Dreiding():
 
     def assign_ptypes(self, mol):
         """
-        Dreiding.assign_ptypes
+        GAFF.assign_ptypes
 
-        Dreiding specific particle typing rules.
+        GAFF specific particle typing rules.
 
         Args:
             mol: rdkit mol object
@@ -119,129 +118,143 @@ class Dreiding():
         mol.SetProp('pair_style', self.pair_style)
         
         for p in mol.GetAtoms():
-            p.bond_orders = [x.GetBondTypeAsDouble() for x in p.GetBonds()]
-            if p.GetSymbol() == 'H':
-                self.set_ptype(p, 'H_')
-            elif p.GetSymbol() == 'C':
-                if p.bond_orders and (4 in p.bond_orders or p.GetIsAromatic()):
-                    self.set_ptype(p, 'C_R')
-                elif p.GetTotalDegree()  == 4:
-                    self.set_ptype(p, 'C_3')
-                elif p.GetTotalDegree()  == 3:
-                    self.set_ptype(p, 'C_2')
-                elif p.GetTotalDegree()  == 2:
-                    self.set_ptype(p, 'C_1')
-                else:
-                    utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
-                                % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
-                    result_flag = False
+            if not self.assign_ptypes_atom(p):
+                result_flag = False
+        
+        return result_flag
 
-            elif p.GetSymbol() == 'N':
-                if p.bond_orders and (4 in p.bond_orders or p.GetIsAromatic()):
-                    self.set_ptype(p, 'N_R')
-                elif 2 in p.bond_orders:
-                    self.set_ptype(p, 'N_2')
-                elif 3 in p.bond_orders:
-                    self.set_ptype(p, 'N_1')
-                elif 1 in p.bond_orders:
-                    for pb in p.GetNeighbors():
-                        if pb.GetSymbol() == 'C' and pb.GetTotalDegree() == 3:
-                            self.set_ptype(p, 'N_2')
-                    if not p.GetProp('ff_type'):
-                        self.set_ptype(p, 'N_3')
-                else:
-                    utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
-                                % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
-                    result_flag = False
 
-            elif p.GetSymbol() == 'O':
-                if p.bond_orders and (4 in p.bond_orders or p.GetIsAromatic()):
-                    self.set_ptype(p, 'O_R')
-                elif 2 in p.bond_orders:
-                    self.set_ptype(p, 'O_2')
-                elif 3 in p.bond_orders:
-                    self.set_ptype(p, 'O_1')
-                elif 1 in p.bond_orders and len(set(p.bond_orders)) == 1:
-                    self.set_ptype(p, 'O_3')
-                else:
-                    utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
-                                % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
-                    result_flag = False
+    def assign_ptypes_atom(self, p):
+        """
+        Dreiding.assign_ptypes_atom
 
-            elif p.GetSymbol() == 'F':
-                self.set_ptype(p, 'F_')
-            elif p.GetSymbol() == 'P':
-                self.set_ptype(p, 'P_3')
-            elif p.GetSymbol() == 'S':
-                self.set_ptype(p, 'S_3')
-            elif p.GetSymbol() == 'Cl':
-                self.set_ptype(p, 'Cl')
-            elif p.GetSymbol() == 'Br':
-                self.set_ptype(p, 'Br')
-            elif p.GetSymbol() == 'Si':
-                self.set_ptype(p, 'Si3')
-            elif p.GetSymbol() == 'B':
-                if p.GetTotalDegree() == 4:
-                    self.set_ptype(p, 'B_3')
-                elif p.GetTotalDegree() == 3:
-                    self.set_ptype(p, 'B_2')
-                else:
-                    utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
-                                % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
-                    result_flag = False
+        Dreiding specific particle typing rules for atom.
 
-            elif p.GetSymbol() == 'Al':
-                self.set_ptype(p, 'Al3')
-            elif p.GetSymbol() == 'Ga':
-                self.set_ptype(p, 'Ga3')
-            elif p.GetSymbol() == 'Ge':
-                self.set_ptype(p, 'Ge3')
-            elif p.GetSymbol() == 'As':
-                self.set_ptype(p, 'As3')
-            elif p.GetSymbol() == 'Se':
-                self.set_ptype(p, 'Se3')
-            elif p.GetSymbol() == 'In':
-                self.set_ptype(p, 'In3')
-            elif p.GetSymbol() == 'Sn':
-                self.set_ptype(p, 'Sn3')
-            elif p.GetSymbol() == 'Sb':
-                self.set_ptype(p, 'Sb3')
-            elif p.GetSymbol() == 'Te':
-                self.set_ptype(p, 'Te3')
-            elif p.GetSymbol() == 'I':
-                self.set_ptype(p, 'I_')
-            elif p.GetSymbol() == 'Na':
-                self.set_ptype(p, 'Na')
-            elif p.GetSymbol() == 'Ca':
-                self.set_ptype(p, 'Ca')
-            elif p.GetSymbol() == 'Fe':
-                self.set_ptype(p, 'Fe')
-            elif p.GetSymbol() == 'Zn':
-                self.set_ptype(p, 'Zn')
-            elif p.GetSymbol() == 'Ru':
-                self.set_ptype(p, 'Ru')
-            elif p.GetSymbol() == 'Ti':
-                self.set_ptype(p, 'Ti')
+        Args:
+            p: rdkit atom object
 
-            elif p.GetSymbol() == '*':
-                p.SetProp('ff_type', '*')
-                p.SetDoubleProp('ff_epsilon', 0.0)
-                p.SetDoubleProp('ff_sigma', 0.0)
+        Returns:
+            boolean
+        """
+        result_flag = True
 
-            ######################################
-            # Assignment error
-            ######################################
+        p.bond_orders = [x.GetBondTypeAsDouble() for x in p.GetBonds()]
+
+        if p.GetSymbol() == 'H':
+            self.set_ptype(p, 'H_')
+        elif p.GetSymbol() == 'C':
+            if p.bond_orders and (4 in p.bond_orders or p.GetIsAromatic()):
+                self.set_ptype(p, 'C_R')
+            elif p.GetTotalDegree()  == 4:
+                self.set_ptype(p, 'C_3')
+            elif p.GetTotalDegree()  == 3:
+                self.set_ptype(p, 'C_2')
+            elif p.GetTotalDegree()  == 2:
+                self.set_ptype(p, 'C_1')
             else:
                 utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
                             % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
                 result_flag = False
 
+        elif p.GetSymbol() == 'N':
+            if p.bond_orders and (4 in p.bond_orders or p.GetIsAromatic()):
+                self.set_ptype(p, 'N_R')
+            elif 2 in p.bond_orders:
+                self.set_ptype(p, 'N_2')
+            elif 3 in p.bond_orders:
+                self.set_ptype(p, 'N_1')
+            elif 1 in p.bond_orders:
+                for pb in p.GetNeighbors():
+                    if pb.GetSymbol() == 'C' and pb.GetTotalDegree() == 3:
+                        self.set_ptype(p, 'N_2')
+                if not p.GetProp('ff_type'):
+                    self.set_ptype(p, 'N_3')
+            else:
+                utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
+                            % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
+                result_flag = False
 
-        ###########################################
-        # Assignment of special atom type in GAFF
-        ###########################################
-        #if result_flag: self.assign_special_ptype(mol)
-        
+        elif p.GetSymbol() == 'O':
+            if p.bond_orders and (4 in p.bond_orders or p.GetIsAromatic()):
+                self.set_ptype(p, 'O_R')
+            elif 2 in p.bond_orders:
+                self.set_ptype(p, 'O_2')
+            elif 3 in p.bond_orders:
+                self.set_ptype(p, 'O_1')
+            elif 1 in p.bond_orders and len(set(p.bond_orders)) == 1:
+                self.set_ptype(p, 'O_3')
+            else:
+                utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
+                            % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
+                result_flag = False
+
+        elif p.GetSymbol() == 'F':
+            self.set_ptype(p, 'F_')
+        elif p.GetSymbol() == 'P':
+            self.set_ptype(p, 'P_3')
+        elif p.GetSymbol() == 'S':
+            self.set_ptype(p, 'S_3')
+        elif p.GetSymbol() == 'Cl':
+            self.set_ptype(p, 'Cl')
+        elif p.GetSymbol() == 'Br':
+            self.set_ptype(p, 'Br')
+        elif p.GetSymbol() == 'Si':
+            self.set_ptype(p, 'Si3')
+        elif p.GetSymbol() == 'B':
+            if p.GetTotalDegree() == 4:
+                self.set_ptype(p, 'B_3')
+            elif p.GetTotalDegree() == 3:
+                self.set_ptype(p, 'B_2')
+            else:
+                utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
+                            % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
+                result_flag = False
+
+        elif p.GetSymbol() == 'Al':
+            self.set_ptype(p, 'Al3')
+        elif p.GetSymbol() == 'Ga':
+            self.set_ptype(p, 'Ga3')
+        elif p.GetSymbol() == 'Ge':
+            self.set_ptype(p, 'Ge3')
+        elif p.GetSymbol() == 'As':
+            self.set_ptype(p, 'As3')
+        elif p.GetSymbol() == 'Se':
+            self.set_ptype(p, 'Se3')
+        elif p.GetSymbol() == 'In':
+            self.set_ptype(p, 'In3')
+        elif p.GetSymbol() == 'Sn':
+            self.set_ptype(p, 'Sn3')
+        elif p.GetSymbol() == 'Sb':
+            self.set_ptype(p, 'Sb3')
+        elif p.GetSymbol() == 'Te':
+            self.set_ptype(p, 'Te3')
+        elif p.GetSymbol() == 'I':
+            self.set_ptype(p, 'I_')
+        elif p.GetSymbol() == 'Na':
+            self.set_ptype(p, 'Na')
+        elif p.GetSymbol() == 'Ca':
+            self.set_ptype(p, 'Ca')
+        elif p.GetSymbol() == 'Fe':
+            self.set_ptype(p, 'Fe')
+        elif p.GetSymbol() == 'Zn':
+            self.set_ptype(p, 'Zn')
+        elif p.GetSymbol() == 'Ru':
+            self.set_ptype(p, 'Ru')
+        elif p.GetSymbol() == 'Ti':
+            self.set_ptype(p, 'Ti')
+
+        elif p.GetSymbol() == '*':
+            p.SetProp('ff_type', '*')
+            p.SetDoubleProp('ff_epsilon', 0.0)
+            p.SetDoubleProp('ff_sigma', 0.0)
+
+        ######################################
+        # Assignment error
+        ######################################
+        else:
+            utils.radon_print('Cannot assignment index %i, element %s, num. of bonds %i, hybridization %s'
+                        % (p.GetIdx(), p.GetSymbol(), p.GetTotalDegree(), str(p.GetHybridization())), level=2 )
+            result_flag = False        
         
         return result_flag
         
@@ -256,9 +269,9 @@ class Dreiding():
         
     def assign_btypes(self, mol):
         """
-        Dreiding.assign_btypes
+        GAFF.assign_btypes
 
-        Dreiding specific bond typing rules.
+        GAFF specific bond typing rules.
 
         Args:
             mol: rdkit mol object
@@ -268,37 +281,54 @@ class Dreiding():
         """
         result_flag = True
         mol.SetProp('bond_style', self.bond_style)
-        alt_ptype = self.alt_ptype
-        for b in mol.GetBonds():
-            ba = b.GetBeginAtom().GetProp('ff_type')
-            bb = b.GetEndAtom().GetProp('ff_type')
-            bt = '%s,%s' % (ba, bb)
-            
-            result = self.set_btype(b, bt)
-            if not result:
-                alt1 = alt_ptype[ba] if ba in alt_ptype.keys() else None
-                alt2 = alt_ptype[bb] if bb in alt_ptype.keys() else None
-                if alt1 is None and alt2 is None:
-                    utils.radon_print(('Can not assign this bond %s,%s' % (ba, bb)), level=2)
-                    result_flag = False
-                    continue
-                
-                bt_alt = []
-                if alt1: bt_alt.append('%s,%s' % (alt1, bb))
-                if alt2: bt_alt.append('%s,%s' % (ba, alt2))
-                if alt1 and alt2: bt_alt.append('%s,%s' % (alt1, alt2))
 
-                for bt in bt_alt:
-                    result = self.set_btype(b, bt)
-                    if result:
-                        utils.radon_print('Using alternate bond type %s instead of %s,%s' % (bt, ba, bb))
-                        break
-                        
-                if not b.HasProp('ff_type'):
-                    utils.radon_print(('Can not assign this bond %s,%s' % (ba, bb)), level=2)
-                    result_flag = False
-                    
+        for b in mol.GetBonds():
+            if not self.assign_btypes_bond(b):
+                result_flag = False
+
         return result_flag
+
+
+    def assign_btypes_bond(self, b):
+        """
+        Dreiding.assign_btypes_bond
+
+        Dreiding specific bond typing rules.
+
+        Args:
+            b: rdkit bond object
+
+        Returns:
+            boolean
+        """
+        ba = b.GetBeginAtom().GetProp('ff_type')
+        bb = b.GetEndAtom().GetProp('ff_type')
+        bt = '%s,%s' % (ba, bb)
+        
+        result = self.set_btype(b, bt)
+        if not result:
+            alt1 = self.alt_ptype[ba] if ba in self.alt_ptype.keys() else None
+            alt2 = self.alt_ptype[bb] if bb in self.alt_ptype.keys() else None
+            if alt1 is None and alt2 is None:
+                utils.radon_print(('Can not assign this bond %s,%s' % (ba, bb)), level=2)
+                return False
+            
+            bt_alt = []
+            if alt1: bt_alt.append('%s,%s' % (alt1, bb))
+            if alt2: bt_alt.append('%s,%s' % (ba, alt2))
+            if alt1 and alt2: bt_alt.append('%s,%s' % (alt1, alt2))
+
+            for bt in bt_alt:
+                result = self.set_btype(b, bt)
+                if result:
+                    utils.radon_print('Using alternate bond type %s instead of %s,%s' % (bt, ba, bb))
+                    break
+                    
+            if not b.HasProp('ff_type'):
+                utils.radon_print(('Can not assign this bond %s,%s' % (ba, bb)), level=2)
+                return False
+                    
+        return True
     
     
     def set_btype(self, b, bt):
@@ -326,35 +356,70 @@ class Dreiding():
         """
         result_flag = True
         mol.SetProp('angle_style', self.angle_style)
-        alt_ptype = self.alt_ptype
-        setattr(mol, 'angles', [])
-
-        count=0
+        setattr(mol, 'angles', {})
+        
         for p in mol.GetAtoms():
-            for p1 in p.GetNeighbors():
-                for p2 in p.GetNeighbors():
-                    if p1.GetIdx() == p2.GetIdx(): continue
-                    unique = True
-                    atoms = [p1, p, p2]
-                    for ang in mol.angles:
-                        if ((ang.a == p1.GetIdx() and ang.b == p.GetIdx() and ang.c == p2.GetIdx()) or
-                            (ang.c == p1.GetIdx() and ang.b == p.GetIdx() and ang.a == p2.GetIdx())):
-                            unique = False
-                    if unique:
-                        pt1 = p1.GetProp('ff_type')
-                        pt = p.GetProp('ff_type')
-                        pt2 = p2.GetProp('ff_type')
-                        at = '%s,%s,%s' % (pt1, pt, pt2)
-                        
-                        result = self.set_atype(mol, a=p1.GetIdx(), b=p.GetIdx(), c=p2.GetIdx(), at=at)
-                        
-                        if not result:
-                            utils.radon_print(('Can not assign this angle %s,%s,%s' % (pt1, pt, pt2)), level=2)
-                            result_flag = False
-                            continue
+            if not self.assign_atypes_atom(mol, p):
+                result_flag = False
+
+        return result_flag
+
+
+    def assign_atypes_atom(self, mol, p, replace=False):
+        """
+        Dreiding.assign_atypes
+
+        Dreiding specific angle typing rules for an atom.
+
+        Args:
+            mol: rdkit mol object
+
+        Returns:
+            boolean
+        """
+        result_flag = True
+        b = p.GetIdx()
+
+        for p1 in p.GetNeighbors():
+            a = p1.GetIdx()
+
+            for p2 in p.GetNeighbors():
+                c = p2.GetIdx()
+
+                if a == c:
+                    continue
+
+                unique = True
+                key1 = '%i,%i,%i' % (a, b, c)
+                key2 = '%i,%i,%i' % (c, b, a)
+
+                if key1 in mol.angles:
+                    if replace:
+                        del mol.angles[key1]
+                    else:
+                        unique = False
+                elif key2 in mol.angles:
+                    if replace:
+                        del mol.angles[key2]
+                    else:
+                        unique = False
+
+                if unique or replace:
+                    pt1 = p1.GetProp('ff_type')
+                    pt = p.GetProp('ff_type')
+                    pt2 = p2.GetProp('ff_type')
+                    at = '%s,%s,%s' % (pt1, pt, pt2)
+                    
+                    result = self.set_atype(mol, a=a, b=b, c=c, at=at)
+                    
+                    if not result:
+                        utils.radon_print(('Can not assign this angle %s,%s,%s' % (pt1, pt, pt2)), level=2)
+                        result_flag = False
+                        continue
 
         return result_flag
     
+
     def set_atype(self, mol, a, b, c, at):
         if at not in self.param.at:
             pt = at.split(',')
@@ -373,7 +438,8 @@ class Dreiding():
             )
         )
         
-        mol.angles.append(angle)
+        key = '%i,%i,%i' % (a, b, c)
+        mol.angles[key] = angle
         
         return True
     
@@ -392,55 +458,92 @@ class Dreiding():
         """
         result_flag = True
         mol.SetProp('dihedral_style', self.dihedral_style)
-        alt_ptype = self.alt_ptype
-        setattr(mol, 'dihedrals', [])
-        
+        setattr(mol, 'dihedrals', {})
+
         for b in mol.GetBonds():
-            p1 = b.GetBeginAtom()
-            p2 = b.GetEndAtom()
-            for p1b in p1.GetNeighbors():
-                for p2b in p2.GetNeighbors():
-                    if p1.GetIdx() == p2b.GetIdx() or p2.GetIdx() == p1b.GetIdx() or p1b.GetIdx() == p2b.GetIdx(): continue
-                    unique = True
-                    atoms = [p1b, p1, p2, p2b]
-                    for dih in mol.dihedrals:
-                        if ((dih.a == p1b.GetIdx() and dih.b == p1.GetIdx() and
-                             dih.c == p2.GetIdx() and dih.d == p2b.GetIdx()) or
-                            (dih.d == p1b.GetIdx() and dih.c == p1.GetIdx() and
-                             dih.b == p2.GetIdx() and dih.a == p2b.GetIdx())):
-                            unique = False
-                    if unique:
-                        p1bt = p1b.GetProp('ff_type')
-                        p1t = p1.GetProp('ff_type')
-                        p2t = p2.GetProp('ff_type')
-                        p2bt = p2b.GetProp('ff_type')
-                        dt = '%s,%s,%s,%s' % (p1bt, p1t, p2t, p2bt)
-                        
-                        result = self.set_dtype(mol, a=p1b.GetIdx(), b=p1.GetIdx(), c=p2.GetIdx(), d=p2b.GetIdx(), dt=dt)
-                        
-                        if not result:
-                            alt1 = alt_ptype[p1t] if p1t in alt_ptype.keys() else None
-                            alt2 = alt_ptype[p2t] if p2t in alt_ptype.keys() else None
-                            if alt1 is None and alt2 is None:
-                                utils.radon_print('Can not assign this dihedral %s,%s,%s,%s' % (p1bt, p1t, p2t, p2bt), level=2)
-                                result_flag = False
-                                continue
-                            
-                            dt_alt = []
-                            if alt1: dt_alt.append('%s,%s,%s,%s' % (p1bt, alt1, p2t, p2bt))
-                            if alt2: dt_alt.append('%s,%s,%s,%s' % (p1bt, p1t, alt2, p2bt))
-                            if alt1 and alt2: dt_alt.append('%s,%s,%s,%s' % (p1bt, alt1, alt2, p2bt))
-                            
-                            for dt in dt_alt:
-                                result = self.set_dtype(mol, a=p1b.GetIdx(), b=p1.GetIdx(), c=p2.GetIdx(), d=p2b.GetIdx(), dt=dt)
-                                if result:
-                                    utils.radon_print('Using alternate dihedral type %s instead of %s,%s,%s,%s' % (dt, p1bt, p1t, p2t, p2bt))
-                                    break
-                                    
-                            if not result:
-                                utils.radon_print(('Can not assign this dihedral %s,%s,%s,%s' % (p1bt, p1t, p2t, p2bt)), level=2)
-                                result_flag = False
+            if not self.assign_dtypes_bond(mol, b):
+                result_flag = False
+
+        return result_flag
+
+
+    def assign_dtypes_bond(self, mol, bond, replace=False):
+        """
+        Dreiding.assign_dtypes
+
+        Dreiding specific dihedral typing rules for a bond.
         
+        Args:
+            bond: rdkit bond object
+
+        Returns:
+            boolean
+        """
+        result_flag = True
+
+        p1 = bond.GetBeginAtom()
+        p2 = bond.GetEndAtom()
+        b = p1.GetIdx()
+        c = p2.GetIdx()
+
+        for p1b in p1.GetNeighbors():
+            a = p1b.GetIdx()
+            if c == a:
+                continue
+
+            for p2b in p2.GetNeighbors():
+                d = p2b.GetIdx()
+
+                if b == d or a == d:
+                    continue
+
+                unique = True
+                key1 = '%i,%i,%i,%i' % (a, b, c, d)
+                key2 = '%i,%i,%i,%i' % (d, c, b, a)
+
+                if key1 in mol.dihedrals:
+                    if replace:
+                        del mol.dihedrals[key1]
+                    else:
+                        unique = False
+                elif key2 in mol.dihedrals:
+                    if replace:
+                        del mol.dihedrals[key2]
+                    else:
+                        unique = False
+
+                if unique or replace:
+                    p1bt = p1b.GetProp('ff_type')
+                    p1t = p1.GetProp('ff_type')
+                    p2t = p2.GetProp('ff_type')
+                    p2bt = p2b.GetProp('ff_type')
+                    dt = '%s,%s,%s,%s' % (p1bt, p1t, p2t, p2bt)
+                    
+                    result = self.set_dtype(mol, a=a, b=b, c=c, d=d, dt=dt)
+                    
+                    if not result:
+                        alt1 = self.alt_ptype[p1t] if p1t in self.alt_ptype else None
+                        alt2 = self.alt_ptype[p2t] if p2t in self.alt_ptype else None
+                        if alt1 is None and alt2 is None:
+                            utils.radon_print('Can not assign this dihedral %s,%s,%s,%s' % (p1bt, p1t, p2t, p2bt), level=2)
+                            result_flag = False
+                            continue
+                        
+                        dt_alt = []
+                        if alt1: dt_alt.append('%s,%s,%s,%s' % (p1bt, alt1, p2t, p2bt))
+                        if alt2: dt_alt.append('%s,%s,%s,%s' % (p1bt, p1t, alt2, p2bt))
+                        if alt1 and alt2: dt_alt.append('%s,%s,%s,%s' % (p1bt, alt1, alt2, p2bt))
+                        
+                        for dt in dt_alt:
+                            result = self.set_dtype(mol, a=a, b=b, c=c, d=d, dt=dt)
+                            if result:
+                                utils.radon_print('Using alternate dihedral type %s instead of %s,%s,%s,%s' % (dt, p1bt, p1t, p2t, p2bt))
+                                break
+                                
+                        if not result:
+                            utils.radon_print(('Can not assign this dihedral %s,%s,%s,%s' % (p1bt, p1t, p2t, p2bt)), level=2)
+                            result_flag = False
+    
         return result_flag
 
 
@@ -469,7 +572,8 @@ class Dreiding():
             )
         )
         
-        mol.dihedrals.append(dihedral)
+        key = '%i,%i,%i,%i' % (a, b, c, d)        
+        mol.dihedrals[key] = dihedral
         
         return True
 
@@ -487,56 +591,82 @@ class Dreiding():
             boolean
         """
         mol.SetProp('improper_style', self.improper_style)
-        alt_ptype = self.alt_ptype
-        setattr(mol, 'impropers', [])
+        setattr(mol, 'impropers', {})
         
         for p in mol.GetAtoms():
-            if len(p.GetNeighbors()) == 3:
-                for perm in permutations(p.GetNeighbors(), 3):
-                    pt = p.GetProp('ff_type')
-                    p1t = perm[0].GetProp('ff_type')
-                    p2t = perm[1].GetProp('ff_type')
-                    p3t = perm[2].GetProp('ff_type')
-                    it = '%s,%s,%s,%s' % (pt, p1t, p2t, p3t)
-                    
-                    result = self.set_itype(mol, a=p.GetIdx(), b=perm[0].GetIdx(), c=perm[1].GetIdx(), d=perm[2].GetIdx(), it=it)
-                    
-                    if not result:
-                        alt1 = alt_ptype[pt] if pt in alt_ptype.keys() else None
-                        alt2 = alt_ptype[p1t] if p1t in alt_ptype.keys() else None
-                        alt3 = alt_ptype[p2t] if p2t in alt_ptype.keys() else None
-                        alt4 = alt_ptype[p3t] if p3t in alt_ptype.keys() else None
-                        if alt1 is None and alt2 is None and alt3 is None and alt4 is None:
-                            break
-                        
-                        it_alt = []
-                        if alt1: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, p2t, p3t))
-                        if alt2: it_alt.append('%s,%s,%s,%s' % (pt, alt2, p2t, p3t))
-                        if alt3: it_alt.append('%s,%s,%s,%s' % (pt, p1t, alt3, p3t))
-                        if alt4: it_alt.append('%s,%s,%s,%s' % (pt, p1t, p2t, alt4))
-
-                        if alt1 and alt2: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, p2t, p3t))
-                        if alt1 and alt3: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, alt3, p3t))
-                        if alt1 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, p2t, alt4))
-                        if alt2 and alt3: it_alt.append('%s,%s,%s,%s' % (pt, alt2, alt3, p3t))
-                        if alt2 and alt4: it_alt.append('%s,%s,%s,%s' % (pt, alt2, p2t, alt4))
-                        if alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (pt, p1t, alt3, alt4))
-                        
-                        if alt1 and alt2 and alt3: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, alt3, p3t))
-                        if alt1 and alt2 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, p2t, alt4))
-                        if alt1 and alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, alt3, alt4))
-                        if alt2 and alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (pt, alt2, alt3, alt4))
-
-                        if alt1 and alt2 and alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, alt3, alt4))
-                        
-                        for it in it_alt:
-                            result = self.set_itype(mol, a=p.GetIdx(), b=perm[0].GetIdx(), c=perm[1].GetIdx(), d=perm[2].GetIdx(), it=it)
-                            if result:
-                                utils.radon_print('Using alternate improper type %s instead of %s,%s,%s,%s' % (it, pt, p1t, p2t, p3t))
-                                break
-                    if result:
-                        break
+            self.assign_itypes_atom(mol, p)
         
+        return True            
+
+
+    def assign_itypes_atom(self, mol, p, replace=False):
+        """
+        Dreiding.assign_itypes_atom
+
+        Dreiding specific improper typing rules for an atom.
+
+        Args:
+            p: rdkit atom object
+
+        Returns:
+            boolean
+        """
+        if p.GetTotalDegree() == 3:
+            a = p.GetIdx()
+
+            for perm in permutations(p.GetNeighbors(), 3):
+                pt = p.GetProp('ff_type')
+                p1t = perm[0].GetProp('ff_type')
+                p2t = perm[1].GetProp('ff_type')
+                p3t = perm[2].GetProp('ff_type')
+                it = '%s,%s,%s,%s' % (pt, p1t, p2t, p3t)
+                b = perm[0].GetIdx()
+                c = perm[1].GetIdx()
+                d = perm[2].GetIdx()
+                key = '%i,%i,%i,%i' % (a, b, c, d)
+
+                if replace:
+                    if key in mol.impropers:
+                        del mol.impropers[key]
+
+                result = self.set_itype(mol, a=a, b=b, c=c, d=d, it=it)
+                
+                if not result:
+                    alt1 = self.alt_ptype[pt] if pt in self.alt_ptype else None
+                    alt2 = self.alt_ptype[p1t] if p1t in self.alt_ptype else None
+                    alt3 = self.alt_ptype[p2t] if p2t in self.alt_ptype else None
+                    alt4 = self.alt_ptype[p3t] if p3t in self.alt_ptype else None
+                    if alt1 is None and alt2 is None and alt3 is None and alt4 is None:
+                        break
+                    
+                    it_alt = []
+                    if alt1: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, p2t, p3t))
+                    if alt2: it_alt.append('%s,%s,%s,%s' % (pt, alt2, p2t, p3t))
+                    if alt3: it_alt.append('%s,%s,%s,%s' % (pt, p1t, alt3, p3t))
+                    if alt4: it_alt.append('%s,%s,%s,%s' % (pt, p1t, p2t, alt4))
+
+                    if alt1 and alt2: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, p2t, p3t))
+                    if alt1 and alt3: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, alt3, p3t))
+                    if alt1 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, p2t, alt4))
+                    if alt2 and alt3: it_alt.append('%s,%s,%s,%s' % (pt, alt2, alt3, p3t))
+                    if alt2 and alt4: it_alt.append('%s,%s,%s,%s' % (pt, alt2, p2t, alt4))
+                    if alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (pt, p1t, alt3, alt4))
+                    
+                    if alt1 and alt2 and alt3: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, alt3, p3t))
+                    if alt1 and alt2 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, p2t, alt4))
+                    if alt1 and alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, p1t, alt3, alt4))
+                    if alt2 and alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (pt, alt2, alt3, alt4))
+
+                    if alt1 and alt2 and alt3 and alt4: it_alt.append('%s,%s,%s,%s' % (alt1, alt2, alt3, alt4))
+                    
+                    for it in it_alt:
+                        result = self.set_itype(mol, a=a, b=b, c=c, d=d, it=it)
+                        if result:
+                            utils.radon_print('Using alternate improper type %s instead of %s,%s,%s,%s' % (it, pt, p1t, p2t, p3t))
+                            break
+                if result:
+                    break
+    
         return True            
 
 
@@ -567,7 +697,8 @@ class Dreiding():
             )
         )
         
-        mol.impropers.append(improper)
+        key = '%i,%i,%i,%i' % (a, b, c, d)
+        mol.impropers[key] = improper
         
         return True
 

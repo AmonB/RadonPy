@@ -11,11 +11,20 @@ matplotlib.use('Agg')
 
 import pandas as pd
 import os
+import sys
 
 # Preset module for solubility parameter calculation require to install "TALLY" package in LAMMPS
 # For user installed LAMMPS
 # from radonpy.core import const
 # const.lammps_exec = '/path/to/lammps/binary'
+
+# For Fugaku
+# from radonpy.core import const
+# const.mpi_cmd = 'mpiexec -n %i'
+# const.check_package_disable = True
+# const.lammps_exec = '/vol0003/hp210264/data/radonpy/lammps/lmp_tuned'
+# os.environ['RadonPy_LAMMPS_INTEL'] = 'off'
+# os.environ['RadonPy_LAMMPS_OPT'] = 'off'
 
 from radonpy.core import utils
 from radonpy.sim import helper
@@ -35,13 +44,17 @@ if __name__ == '__main__':
     gpu = int(os.environ.get('RadonPy_GPU', 0))
     rst_json_file = os.environ.get('RadonPy_JSON_File', None) 
     rst_pickle_file = os.environ.get('RadonPy_Pickle_File', None)
-    
+    sp_force = bool(os.environ.get('RadonPy_SP_Force', False) == 'True')
+
     work_dir = './%s' % data['DBID']
     save_dir = os.path.join(work_dir, 'analyze')
     io = helper.IO_Helper(work_dir, save_dir)
     
     # Load results.csv or input_data.csv file
     data = io.load_md_csv(data)
+    if not data['check_eq'] and not sp_force:
+        print('check_eq: FALSE')
+        sys.exit(0)
 
     # Load JSON file, pickle file, or LAMMPS data file
     mol = io.load_md_obj(rst_json_file=rst_json_file, rst_pickle_file=rst_pickle_file)
