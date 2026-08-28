@@ -30,43 +30,43 @@ class Equilibration(preset.Preset):
         """
         super().__init__(mol, prefix=prefix, work_dir=work_dir, save_dir=save_dir, solver_path=solver_path, **kwargs)
 
-        self.in_file1 = kwargs.get('in_file1', '%seq1.in' % self.prefix)
-        self.in_file2 = kwargs.get('in_file2', '%seq2.in' % self.prefix)
-        self.in_file = kwargs.get('in_file', '%seq3.in' % self.prefix)
-        self.dat_file1 = kwargs.get('dat_file1', '%seq1.data' % self.prefix)
-        self.dat_file2 = kwargs.get('dat_file2', '%seq2.data' % self.prefix)
-        self.dat_file = kwargs.get('dat_file', '%seq3.data' % self.prefix)
-        self.pdb_file = kwargs.get('pdb_file', '%seq1.pdb' % self.prefix)
-        self.log_file1 = kwargs.get('log_file1', '%seq1.log' % self.prefix)
-        self.log_file2 = kwargs.get('log_file2', '%seq2.log' % self.prefix)
-        self.log_file = kwargs.get('log_file', '%seq3.log' % self.prefix)
+        self.in_file1 = kwargs.get('in_file1', f'{self.prefix}eq1.in' )
+        self.in_file2 = kwargs.get('in_file2', f'{self.prefix}eq2.in')
+        self.in_file = kwargs.get('in_file', f'{self.prefix}eq3.in')
+        self.dat_file1 = kwargs.get('dat_file1', f'{self.prefix}eq1.data')
+        self.dat_file2 = kwargs.get('dat_file2', f'{self.prefix}eq2.data')
+        self.dat_file = kwargs.get('dat_file', f'{self.prefix}eq3.data')
+        self.pdb_file = kwargs.get('pdb_file', f'{self.prefix}eq1.pdb')
+        self.log_file1 = kwargs.get('log_file1', f'{self.prefix}eq1.log')
+        self.log_file2 = kwargs.get('log_file2', f'{self.prefix}eq2.log')
+        self.log_file = kwargs.get('log_file', f'{self.prefix}eq3.log')
         if no_traj_ann:
             self.dump_file1 = kwargs.get('dump_file1')
             self.dump_file2 = kwargs.get('dump_file2')
         else:
-            self.dump_file1 = kwargs.get('dump_file1', '%seq1.dump' % self.prefix)
-            self.dump_file2 = kwargs.get('dump_file2', '%seq2.dump' % self.prefix)
-        self.dump_file = kwargs.get('dump_file', '%seq3.dump' % self.prefix)
+            self.dump_file1 = kwargs.get('dump_file1', f'{self.prefix}eq1.dump')
+            self.dump_file2 = kwargs.get('dump_file2', f'{self.prefix}eq2.dump')
+        self.dump_file = kwargs.get('dump_file', f'{self.prefix}eq3.dump')
         if no_traj_ann:
             self.xtc_file1 = kwargs.get('xtc_file1')
             self.xtc_file2 = kwargs.get('xtc_file2')            
         else:
-            self.xtc_file1 = kwargs.get('xtc_file1', '%seq1.xtc' % self.prefix)
-            self.xtc_file2 = kwargs.get('xtc_file2', '%seq2.xtc' % self.prefix)
-        self.xtc_file = kwargs.get('xtc_file', '%seq3.xtc' % self.prefix)
-        self.rg_file = kwargs.get('rg_file', '%srg3.profile' % self.prefix)
-        self.last_str1 = kwargs.get('last_str1', '%seq1_last.dump' % self.prefix)
-        self.last_str2 = kwargs.get('last_str2', '%seq2_last.dump' % self.prefix)
-        self.last_str = kwargs.get('last_str', '%seq3_last.dump' % self.prefix)
+            self.xtc_file1 = kwargs.get('xtc_file1', f'{self.prefix}eq1.xtc')
+            self.xtc_file2 = kwargs.get('xtc_file2', f'{self.prefix}eq2.xtc')
+        self.xtc_file = kwargs.get('xtc_file', f'{self.prefix}eq3.xtc')
+        self.rg_file = kwargs.get('rg_file', f'{self.prefix}rg3.profile')
+        self.last_str1 = kwargs.get('last_str1', f'{self.prefix}eq1_last.dump')
+        self.last_str2 = kwargs.get('last_str2', f'{self.prefix}eq2_last.dump')
+        self.last_str = kwargs.get('last_str', f'{self.prefix}eq3_last.dump')
         self.last_data1 = self.dat_file2
         self.last_data2 = self.dat_file
-        self.last_data = kwargs.get('last_data', '%seq3_last.data' % self.prefix)
-        self.pickle_file1 = kwargs.get('pickle_file1', '%seq1_last.pickle' % self.prefix)
-        self.pickle_file2 = kwargs.get('pickle_file2', '%seq2_last.pickle' % self.prefix)
-        self.pickle_file = kwargs.get('pickle_file', '%seq3_last.pickle' % self.prefix)
-        self.json_file1 = kwargs.get('json_file1', '%seq1_last.json' % self.prefix)
-        self.json_file2 = kwargs.get('json_file2', '%seq2_last.json' % self.prefix)
-        self.json_file = kwargs.get('json_file', '%seq3_last.json' % self.prefix)
+        self.last_data = kwargs.get('last_data', f'{self.prefix}eq3_last.data')
+        self.pickle_file1 = kwargs.get('pickle_file1', f'{self.prefix}eq1_last.pickle')
+        self.pickle_file2 = kwargs.get('pickle_file2', f'{self.prefix}eq2_last.pickle')
+        self.pickle_file = kwargs.get('pickle_file', f'{self.prefix}eq3_last.pickle')
+        self.json_file1 = kwargs.get('json_file1', f'{self.prefix}eq1_last.json')
+        self.json_file2 = kwargs.get('json_file2', f'{self.prefix}eq2_last.json')
+        self.json_file = kwargs.get('json_file', f'{self.prefix}eq3_last.json')
 
 
     def packing(self, f_density=0.8, max_temp=700, comm_cutoff=8.0, **kwargs):
@@ -92,7 +92,7 @@ class Equilibration(preset.Preset):
         md.rst = True
         md.outstr = kwargs.get('last_str', self.last_str1)
         md.write_data = kwargs.get('last_data', self.last_data1)
-        md.add.append('comm_modify cutoff %f' % comm_cutoff)
+        md.add.append(f'comm_modify cutoff {comm_cutoff:.1f}')
 
         md.add_min(min_style='cg')
         md.add_md('nvt', 20000, time_step=0.1, shake=False, t_start=300.0, t_stop=300.0, **kwargs)
@@ -116,7 +116,7 @@ class Equilibration(preset.Preset):
         md.angle_style = self.angle_style
         md.dihedral_style = self.dihedral_style
         md.improper_style = self.improper_style
-        md.neighbor = '%s bin' % self.neighbor_dis
+        md.neighbor = f'{self.neighbor_dis} bin'
         md.log_file = kwargs.get('log_file', self.log_file2)
         md.dat_file = kwargs.get('dat_file', self.dat_file2)
         md.dump_file = kwargs.get('dump_file', self.dump_file2)
@@ -169,7 +169,7 @@ class Equilibration(preset.Preset):
         md.angle_style = self.angle_style
         md.dihedral_style = self.dihedral_style
         md.improper_style = self.improper_style
-        md.neighbor = '%s bin' % self.neighbor_dis
+        md.neighbor = f'{self.neighbor_dis} bin'
         md.log_file = kwargs.get('log_file', self.log_file2)
         md.dat_file = kwargs.get('dat_file', self.dat_file2)
         md.dump_file = kwargs.get('dump_file', self.dump_file2)
@@ -207,7 +207,7 @@ class Equilibration(preset.Preset):
         md.angle_style = self.angle_style
         md.dihedral_style = self.dihedral_style
         md.improper_style = self.improper_style
-        md.neighbor = '%s bin' % self.neighbor_dis
+        md.neighbor = f'{self.neighbor_dis} bin'
         md.log_file = kwargs.get('log_file', self.log_file)
         md.dat_file = kwargs.get('dat_file', self.dat_file)
         md.dump_file = kwargs.get('dump_file', self.dump_file)
@@ -303,7 +303,7 @@ class Annealing(Equilibration):
         utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file1))
         utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file1))
         dt2 = datetime.datetime.now()
-        utils.radon_print('Complete packing simulation (eq1). Elapsed time = %s' % str(dt2-dt1), level=1)
+        utils.radon_print(f'Complete packing simulation (eq1). Elapsed time = {str(dt2-dt1)}', level=1)
 
         dt1 = datetime.datetime.now()
         utils.radon_print('Annealing simulation (eq2) by LAMMPS is running...', level=1)
@@ -313,7 +313,7 @@ class Annealing(Equilibration):
         utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file2))
         utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file2))
         dt2 = datetime.datetime.now()
-        utils.radon_print('Complete annealing simulation (eq2). Elapsed time = %s' % str(dt2-dt1), level=1)
+        utils.radon_print(f'Complete annealing simulation (eq2). Elapsed time = {str(dt2-dt1)}', level=1)
 
         dt1 = datetime.datetime.now()
         utils.radon_print('Sampling simulation (eq3) by LAMMPS is running...', level=1)
@@ -323,7 +323,7 @@ class Annealing(Equilibration):
         utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
         utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
         dt2 = datetime.datetime.now()
-        utils.radon_print('Complete sampling simulation (eq3). Elapsed time = %s' % str(dt2-dt1), level=1)
+        utils.radon_print(f'Complete sampling simulation (eq3). Elapsed time = {str(dt2-dt1)}', level=1)
 
         return self.mol
 
@@ -376,36 +376,51 @@ class EQ21step(Equilibration):
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
         lmp.make_dat(self.mol, file_name=self.dat_file1, confId=confId)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print('Packing simulation (eq1) by LAMMPS is running...', level=1)
-        md1 = self.packing(f_density=f_density, comm_cutoff=kwargs.get('comm_cutoff', 8.0), **kwargs)
-        self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.in_file1, last_str=self.last_str1, last_data=self.last_data1,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file1))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file1))
-        dt2 = datetime.datetime.now()
-        utils.radon_print('Complete packing simulation (eq1). Elapsed time = %s' % str(dt2-dt1), level=1)
+        eq1_last_pickle = os.path.join(self.save_dir, self.pickle_file1)
+        if os.path.exists(eq1_last_pickle):
+            utils.radon_print("Packing simulation (eq1) 1 has already completed", level=1)
+            self.mol = utils.pickle_load(eq1_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print('Packing simulation (eq1) by LAMMPS is running...', level=1)
+            md1 = self.packing(f_density=f_density, comm_cutoff=kwargs.get('comm_cutoff', 8.0), **kwargs)
+            self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.in_file1, last_str=self.last_str1, last_data=self.last_data1,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file1))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file1))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete packing simulation (eq1). Elapsed time = {str(dt2-dt1)}', level=1)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print('Larsen\'s 21 step compression/decompression equilibration (eq2) by LAMMPS is running...', level=1)
-        md2 = self.eq21step(max_temp=max_temp, temp=temp, press=press, max_press=max_press,
-                            step_list=step_list, press_ratio=press_ratio, time_step=time_step, set_init_velocity=True, **kwargs)
-        self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.in_file2, last_str=self.last_str2, last_data=self.last_data2,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file2))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file2))
-        dt2 = datetime.datetime.now()
-        utils.radon_print('Complete Larsen 21 step compression/decompression equilibration (eq2). Elapsed time = %s' % str(dt2-dt1), level=1)
+        eq2_last_pickle = os.path.join(self.save_dir, self.pickle_file2)
+        if os.path.exists(eq2_last_pickle):
+            utils.radon_print("Larsen 21 step compression/decompression equilibration (eq2) has already completed", level=1)
+            self.mol = utils.pickle_load(eq2_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print('Larsen\'s 21 step compression/decompression equilibration (eq2) by LAMMPS is running...', level=1)
+            md2 = self.eq21step(max_temp=max_temp, temp=temp, press=press, max_press=max_press,
+                                step_list=step_list, press_ratio=press_ratio, time_step=time_step, set_init_velocity=True, **kwargs)
+            self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.in_file2, last_str=self.last_str2, last_data=self.last_data2,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file2))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file2))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete Larsen 21 step compression/decompression equilibration (eq2). Elapsed time = {str(dt2-dt1)}', level=1)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print('Sampling simulation (eq3) by LAMMPS is running...', level=1)
-        md3 = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
-        self.mol = lmp.run(md3, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
-        dt2 = datetime.datetime.now()
-        utils.radon_print('Complete sampling simulation (eq3). Elapsed time = %s' % str(dt2-dt1), level=1)
+        eq_last_pickle = os.path.join(self.save_dir, self.pickle_file)
+        if os.path.exists(eq_last_pickle):
+            utils.radon_print("sampling simulation (eq3) has already completed")
+            self.mol = utils.pickle_load(eq_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print('Sampling simulation (eq3) by LAMMPS is running...', level=1)
+            md3 = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
+            self.mol = lmp.run(md3, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete sampling simulation (eq3). Elapsed time = {str(dt2-dt1)}', level=1)
 
         return self.mol
 
@@ -446,17 +461,17 @@ class Additional(Equilibration):
 
         self.idx = get_final_idx(self.work_dir) + 1 if idx == 0 else idx
 
-        self.in_file = kwargs.get('in_file', '%seq%i.in' % (self.prefix, self.idx))
-        self.dat_file = kwargs.get('dat_file', '%seq%i.data' % (self.prefix, self.idx))
-        self.pdb_file = kwargs.get('pdb_file', '%seq%i.pdb' % (self.prefix, self.idx))
-        self.log_file = kwargs.get('log_file', '%seq%i.log' % (self.prefix, self.idx))
-        self.dump_file = kwargs.get('dump_file', '%seq%i.dump' % (self.prefix, self.idx))
-        self.xtc_file = kwargs.get('xtc_file', '%seq%i.xtc' % (self.prefix, self.idx))
-        self.rg_file = kwargs.get('rg_file', '%srg%i.profile' % (self.prefix, self.idx))
-        self.last_str = kwargs.get('last_str', '%seq%i_last.dump' % (self.prefix, self.idx))
-        self.last_data = kwargs.get('last_data', '%seq%i_last.data' % (self.prefix, self.idx))
-        self.pickle_file = kwargs.get('pickle_file', '%seq%i_last.pickle' % (self.prefix, self.idx))
-        self.json_file = kwargs.get('json_file', '%seq%i_last.json' % (self.prefix, self.idx))
+        self.in_file = kwargs.get('in_file', f'{self.prefix}eq{self.idx}.in')
+        self.dat_file = kwargs.get('dat_file', f'{self.prefix}eq{self.idx}.data')
+        self.pdb_file = kwargs.get('pdb_file', f'{self.prefix}eq{self.idx}.pdb')
+        self.log_file = kwargs.get('log_file', f'{self.prefix}eq{self.idx}.log')
+        self.dump_file = kwargs.get('dump_file', f'{self.prefix}eq{self.idx}.dump')
+        self.xtc_file = kwargs.get('xtc_file', f'{self.prefix}eq{self.idx}.xtc')
+        self.rg_file = kwargs.get('rg_file', f'{self.prefix}rg{self.idx}.profile')
+        self.last_str = kwargs.get('last_str', f'{self.prefix}eq{self.idx}_last.dump')
+        self.last_data = kwargs.get('last_data', f'{self.prefix}eq{self.idx}_last.data')
+        self.pickle_file = kwargs.get('pickle_file', f'{self.prefix}eq{self.idx}_last.pickle')
+        self.json_file = kwargs.get('json_file', f'{self.prefix}eq{self.idx}_last.json')
 
 
     def exec(self, confId=0, temp=300.0, press=1.0, eq_step=5, omp=1, mpi=1, gpu=0, intel='auto', opt='auto', **kwargs):
@@ -485,14 +500,14 @@ class Additional(Equilibration):
         lmp.make_dat(self.mol, file_name=self.dat_file, confId=confId)
 
         dt1 = datetime.datetime.now()
-        utils.radon_print('Additional equilibration (eq%i) by LAMMPS is running...' % self.idx, level=1)
+        utils.radon_print(f'Additional equilibration (eq{self.idx}) by LAMMPS is running...', level=1)
         md = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
         self.mol = lmp.run(md, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
                            omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
         utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
         utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
         dt2 = datetime.datetime.now()
-        utils.radon_print('Complete additional equilibration (eq%i). Elapsed time = %s' % (self.idx, str(dt2-dt1)), level=1)
+        utils.radon_print(f'Complete additional equilibration (eq{self.idx}). Elapsed time = {str(dt2-dt1)}', level=1)
 
         return self.mol
 
@@ -575,7 +590,7 @@ def get_final_idx(work_dir):
                 if i > idx: idx = i
 
     else:
-        utils.radon_print('Cannot find any last lammps data files or pickle files of equilibration stages in %s' % (work_dir), level=2)
+        utils.radon_print(f'Cannot find any last lammps data files or pickle files of equilibration stages in {work_dir}', level=2)
 
     return idx
 
@@ -587,7 +602,7 @@ def get_final_data(work_dir):
     data_file = None
     for d in work_dir:
         idx = get_final_idx(d)
-        data_files = glob.glob(os.path.join(d, '*eq%i_last.data' % idx))
+        data_files = glob.glob(os.path.join(d, f'*eq{idx}_last.data'))
         if len(data_files) > 0:
             data_file = data_files[0]
             break
@@ -602,7 +617,7 @@ def get_final_pickle(save_dir):
     pickle_file = None
     for d in save_dir:
         idx = get_final_idx(d)
-        pickle_files = glob.glob(os.path.join(d, '*eq%i_last.pickle' % idx))
+        pickle_files = glob.glob(os.path.join(d, f'*eq{idx}_last.pickle'))
         if len(pickle_files) > 0:
             pickle_file = pickle_files[0]
             break
@@ -617,7 +632,7 @@ def get_final_json(save_dir):
     json_file = None
     for d in save_dir:
         idx = get_final_idx(d)
-        json_files = glob.glob(os.path.join(d, '*eq%i_last.json' % idx))
+        json_files = glob.glob(os.path.join(d, f'*eq{idx}_last.json'))
         if len(json_files) > 0:
             json_file = json_files[0]
             break
@@ -633,8 +648,8 @@ def del_dump(del_dir):
             idx = get_final_idx(os.path.join(del_dir, 'analyze'))
             if idx == 0:
                 return False
-        last_dump = 'eq%i.dump' % idx
-        last_xtc = 'eq%i.xtc' % idx
+        last_dump = f'eq{idx}.dump'
+        last_xtc = f'eq{idx}.xtc'
         dump_list = sorted(glob.glob(os.path.join(del_dir, '*.dump')))
         xtc_list = sorted(glob.glob(os.path.join(del_dir, '*.xtc')))
         traj_list = dump_list + xtc_list
@@ -644,7 +659,7 @@ def del_dump(del_dir):
                 continue
             else:
                 os.remove(traj)
-                utils.radon_print('%s is deleted' % traj, level=1)
+                utils.radon_print(f'{traj} is deleted', level=1)
 
     return True
 

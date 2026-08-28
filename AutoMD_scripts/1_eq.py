@@ -87,9 +87,9 @@ if __name__ == '__main__':
         'retry_step': 200,
         'retry_opt_step': 5,
         'mp': 4,
-        'omp': 0,
-        'mpi': 12,
-        'gpu': 0,
+        'omp': opm,
+        'mpi': mpi,
+        'gpu': gpu,
         'work_dir': tmp_dir,
     }
 
@@ -123,83 +123,89 @@ if __name__ == '__main__':
     n = poly.calc_n_from_num_atoms(mols, data['input_natom'], ratio=ratio, terminal1=ter, terminal2=ter2)
     data['DP'] = n
 
-    # Generate homopolymer chain
-    if len(mols) == 1:
-        data['copoly_ratio_list'] = '1'
-        ratio = [1]
-        data['copoly_type'] = ''
-        
-        homopoly = poly.polymerize_rw_mp(mols[0], n, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
-        data['tacticity'] = poly.get_tacticity(homopoly)
+    # if amorphous cell has been generated, load it from pickle
+    amorphous_pickle = os.path.join(save_dir, 'amorphous.pickle')
+    if os.path.exists(amorphous_pickle):
+        ac = utils.pickle_load(amorphous_pickle)
+    else:
 
-        # Force field assignment
-        result = ff.ff_assign(homopoly)
-        if not result:
-            data['remarks'] += '[ERROR: Can not assign force field parameters.]'
-        utils.MolToJSON(homopoly, os.path.join(save_dir, 'polymer.json'))
-        utils.pickle_dump(homopoly, os.path.join(save_dir, 'polymer.pickle'))
+        # Generate homopolymer chain
+        if len(mols) == 1:
+            data['copoly_ratio_list'] = '1'
+            ratio = [1]
+            data['copoly_type'] = ''
 
-        # Generate amorphous cell
-        ac = poly.amorphous_cell(homopoly, data['input_nchain'], density=data['ini_density'])
+            homopoly = poly.polymerize_rw_mp(mols[0], n, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
+            data['tacticity'] = poly.get_tacticity(homopoly)
 
-    # Generate random copolymer chain
-    elif len(mols) > 1 and data['copoly_type'] == 'random':
-        rw_setting['mp'] = min([max([1,rw_setting['omp']*rw_setting['mpi'],rw_setting['omp'],rw_setting['mpi']]), data['input_nchain'], 60])
-        copoly_list = poly.random_copolymerize_rw_mp(mols, n, ratio=ratio, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2,
-                                                     nchain=data['input_nchain'], **rw_setting)
-        for i in range(data['input_nchain']):
             # Force field assignment
-            result = ff.ff_assign(copoly_list[i])
+            result = ff.ff_assign(homopoly)
             if not result:
                 data['remarks'] += '[ERROR: Can not assign force field parameters.]'
-            utils.MolToJSON(copoly_list[i], os.path.join(save_dir, 'polymer%i.json' % i))
-            utils.pickle_dump(copoly_list[i], os.path.join(save_dir, 'polymer%i.pickle' % i))
+            utils.MolToJSON(homopoly, os.path.join(save_dir, 'polymer.json'))
+            utils.pickle_dump(homopoly, os.path.join(save_dir, 'polymer.pickle'))
 
-        data['tacticity'] = poly.get_tacticity(copoly_list[0])
+            # Generate amorphous cell
+            ac = poly.amorphous_cell(homopoly, data['input_nchain'], density=data['ini_density'])
 
-        # Generate amorphous cell
-        ac = poly.amorphous_mixture_cell(copoly_list, [1]*data['input_nchain'], density=data['ini_density'])
+        # Generate random copolymer chain
+        elif len(mols) > 1 and data['copoly_type'] == 'random':
+            rw_setting['mp'] = min([max([1,rw_setting['omp']*rw_setting['mpi'],rw_setting['omp'],rw_setting['mpi']]), data['input_nchain'], 60])
+            copoly_list = poly.random_copolymerize_rw_mp(mols, n, ratio=ratio, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2,
+                                                         nchain=data['input_nchain'], **rw_setting)
+            for i in range(data['input_nchain']):
+                # Force field assignment
+                result = ff.ff_assign(copoly_list[i])
+                if not result:
+                    data['remarks'] += '[ERROR: Can not assign force field parameters.]'
+                utils.MolToJSON(copoly_list[i], os.path.join(save_dir, 'polymer%i.json' % i))
+                utils.pickle_dump(copoly_list[i], os.path.join(save_dir, 'polymer%i.pickle' % i))
 
-    # Generate alternating copolymer chain
-    elif len(mols) > 1 and data['copoly_type'] == 'alternating':
-        ratio = [1/len(mols)]*len(mols)
-        data['copoly_ratio_list'] = ','.join([str(x) for x in ratio])
-        n = poly.calc_n_from_num_atoms(mols, data['input_natom'], ratio=ratio, terminal1=ter, terminal2=ter2)
-        n = round(n/len(mols))
-        data['DP'] = n
-        
-        copoly = poly.copolymerize_rw_mp(mols, n, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
-        data['tacticity'] = poly.get_tacticity(copoly)
+            data['tacticity'] = poly.get_tacticity(copoly_list[0])
 
-        # Force field assignment
-        result = ff.ff_assign(copoly)
-        if not result:
-            data['remarks'] += '[ERROR: Can not assign force field parameters.]'
-        utils.MolToJSON(copoly, os.path.join(save_dir, 'polymer.json'))
-        utils.pickle_dump(copoly, os.path.join(save_dir, 'polymer.pickle'))
-        
-        # Generate amorphous cell
-        ac = poly.amorphous_cell(copoly, data['input_nchain'], density=data['ini_density'])
+            # Generate amorphous cell
+            ac = poly.amorphous_mixture_cell(copoly_list, [1]*data['input_nchain'], density=data['ini_density'])
 
-    # Generate block copolymer chain
-    elif len(mols) > 1 and data['copoly_type'] == 'block':
-        n_list = [round(n*(x/sum(ratio))) for x in ratio]
-        
-        copoly = poly.block_copolymerize_rw_mp(mols, n_list, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
-        data['tacticity'] = poly.get_tacticity(copoly)
+        # Generate alternating copolymer chain
+        elif len(mols) > 1 and data['copoly_type'] == 'alternating':
+            ratio = [1/len(mols)]*len(mols)
+            data['copoly_ratio_list'] = ','.join([str(x) for x in ratio])
+            n = poly.calc_n_from_num_atoms(mols, data['input_natom'], ratio=ratio, terminal1=ter, terminal2=ter2)
+            n = round(n/len(mols))
+            data['DP'] = n
 
-        # Force field assignment
-        result = ff.ff_assign(copoly)
-        if not result:
-            data['remarks'] += '[ERROR: Can not assign force field parameters.]'
-        utils.MolToJSON(copoly, os.path.join(save_dir, 'polymer.json'))
-        utils.pickle_dump(copoly, os.path.join(save_dir, 'polymer.pickle'))
-        
-        # Generate amorphous cell
-        ac = poly.amorphous_cell(copoly, data['input_nchain'], density=data['ini_density'])
-        
-    utils.MolToJSON(ac, os.path.join(save_dir, 'amorphous.json'))
-    utils.pickle_dump(ac, os.path.join(save_dir, 'amorphous.pickle'))
+            copoly = poly.copolymerize_rw_mp(mols, n, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
+            data['tacticity'] = poly.get_tacticity(copoly)
+
+            # Force field assignment
+            result = ff.ff_assign(copoly)
+            if not result:
+                data['remarks'] += '[ERROR: Can not assign force field parameters.]'
+            utils.MolToJSON(copoly, os.path.join(save_dir, 'polymer.json'))
+            utils.pickle_dump(copoly, os.path.join(save_dir, 'polymer.pickle'))
+
+            # Generate amorphous cell
+            ac = poly.amorphous_cell(copoly, data['input_nchain'], density=data['ini_density'])
+
+        # Generate block copolymer chain
+        elif len(mols) > 1 and data['copoly_type'] == 'block':
+            n_list = [round(n*(x/sum(ratio))) for x in ratio]
+
+            copoly = poly.block_copolymerize_rw_mp(mols, n_list, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
+            data['tacticity'] = poly.get_tacticity(copoly)
+
+            # Force field assignment
+            result = ff.ff_assign(copoly)
+            if not result:
+                data['remarks'] += '[ERROR: Can not assign force field parameters.]'
+            utils.MolToJSON(copoly, os.path.join(save_dir, 'polymer.json'))
+            utils.pickle_dump(copoly, os.path.join(save_dir, 'polymer.pickle'))
+
+            # Generate amorphous cell
+            ac = poly.amorphous_cell(copoly, data['input_nchain'], density=data['ini_density'])
+
+        utils.MolToJSON(ac, os.path.join(save_dir, 'amorphous.json'))
+        utils.pickle_dump(ac, os.path.join(save_dir, 'amorphous.pickle'))
 
     # Input data and monomer properties are outputted
     poly_stats = poly.polymer_stats(ac, df=False, join=True)
