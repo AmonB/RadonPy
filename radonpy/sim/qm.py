@@ -19,7 +19,8 @@ __version__ = '1.0b2'
 
 
 def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='charge', qm_solver='psi4',
-    opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
+    opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br':'6-31G(d)', 'I': 'lanl2dz'},
+    geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
     charge_method='HF', charge_basis='6-31G(d)', charge_basis_gen={'Br':'6-31G(d)', 'I': 'lanl2dz'},
     total_charge=None, total_multiplicity=None, **kwargs):
     """
@@ -49,7 +50,7 @@ def assign_charges(mol, charge='RESP', confId=0, opt=True, work_dir=None, tmp_di
         boolean
     """
     flag = calc.assign_charges(mol, charge=charge, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name=log_name, qm_solver=qm_solver,
-            opt_method=opt_method, opt_basis=opt_basis, geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm,
+            opt_method=opt_method, opt_basis=opt_basis, opt_basis_gen=opt_basis_gen, geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm,
             charge_method=charge_method, charge_basis=charge_basis, charge_basis_gen=charge_basis_gen,
             total_charge=total_charge, total_multiplicity=total_multiplicity, **kwargs)
 
@@ -105,6 +106,7 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
     opt_method='wb97m-d3bj', opt_basis='6-31G(d,p)', opt_basis_gen={'Br': '6-31G(d,p)', 'I': 'lanl2dz'}, 
     geom_iter=50, geom_conv='QCHEM', geom_algorithm='RFO',
     sp_method='wb97m-d3bj', sp_basis='6-311G(d,p)', sp_basis_gen={'Br': '6-311G(d,p)', 'I': 'lanl2dz'},
+    dipole_basis='6-311+G(d,p)', dipole_basis_gen={'Br': '6-311+G(d,p)', 'I': 'lanl2dzp'},
     total_charge=None, total_multiplicity=None, **kwargs):
     """
     sim.qm.sp_prop
@@ -125,7 +127,7 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
         opt_basis_gen: Using basis set in the optimize calculation for each element
         sp_method: Using method in the single point calculation (str, default:wb97m-d3bj)
         sp_basis: Using basis set in the single point calculation (str, default:6-311G(2d,p))
-        opt_basis_gen: Using basis set in the single point calculation for each element
+        sp_basis_gen: Using basis set in the single point calculation for each element
 
     return
         dict
@@ -160,6 +162,13 @@ def sp_prop(mol, confId=0, opt=True, work_dir=None, tmp_dir=None, log_name='sp_p
     e_prop['qm_total_energy'] = psi4mol.energy()
     e_prop['qm_homo'] = psi4mol.homo
     e_prop['qm_lumo'] = psi4mol.lumo
+
+    # for dipole without diffuse function, the result is misleading
+    # suggestion, using def2-TZVPD will be better results
+    psi4mol.method = sp_method
+    psi4mol.basis = dipole_basis
+    psi4mol.basis_gen = dipole_basis_gen
+    _ =psi4mol.energy()
     e_prop['qm_dipole_x'], e_prop['qm_dipole_y'], e_prop['qm_dipole_z'] = psi4mol.dipole
     e_prop['qm_dipole'] = np.sqrt(e_prop['qm_dipole_x']**2 + e_prop['qm_dipole_y']**2 + e_prop['qm_dipole_z']**2)
 
@@ -284,14 +293,14 @@ def refractive_index(mols, density, ratio=None, confId=0, opt=True, work_dir=Non
     a_list = []
     
     for i, mol in enumerate(mols):
-        polar_data = polarizability(mol, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name='%s_%i' % (log_name, i), qm_solver=qm_solver, mp=mp,
+        polar_data = polarizability(mol, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir, log_name=f'{log_name}_{i}', qm_solver=qm_solver, mp=mp,
                             opt_method=opt_method, opt_basis=opt_basis, opt_basis_gen=opt_basis_gen, 
                             geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm,
                             polar_method=polar_method, polar_basis=polar_basis, polar_basis_gen=polar_basis_gen,
                             total_charge=total_charge, total_multiplicity=total_multiplicity, **kwargs)
 
         a_list.append(polar_data['qm_polarizability'])
-        for k in polar_data.keys(): ri_data['%s_monomer%i' % (k, i+1)] = polar_data[k]
+        for k in polar_data.keys(): ri_data[f'{k}_monomer{i+1}'] = polar_data[k]
 
     ri_data['refractive_index'] = calc.refractive_index(a_list, density, mol_weight, ratio=ratio)
 
@@ -501,13 +510,13 @@ def polarizability_sos(mol, wavelength=None, confId=0, opt=True, work_dir=None, 
 
         else:
             p_data = {
-                'qm_polarizability_sos_%i' % int(l): alpha,
-                'qm_polarizability_sos_%i_xx' % int(l): tensor[0, 0],
-                'qm_polarizability_sos_%i_yy' % int(l): tensor[1, 1],
-                'qm_polarizability_sos_%i_zz' % int(l): tensor[2, 2],
-                'qm_polarizability_sos_%i_xy' % int(l): (tensor[0, 1]+tensor[1, 0])/2,
-                'qm_polarizability_sos_%i_xz' % int(l): (tensor[0, 2]+tensor[2, 0])/2,
-                'qm_polarizability_sos_%i_yz' % int(l): (tensor[1, 2]+tensor[2, 1])/2,
+                f'qm_polarizability_sos_{int(l)}': alpha,
+                f'qm_polarizability_sos_{int(l)}_xx': tensor[0, 0],
+                f'qm_polarizability_sos_{int(l)}_yy': tensor[1, 1],
+                f'qm_polarizability_sos_{int(l)}_zz': tensor[2, 2],
+                f'qm_polarizability_sos_{int(l)}_xy': (tensor[0, 1]+tensor[1, 0])/2,
+                f'qm_polarizability_sos_{int(l)}_xz': (tensor[0, 2]+tensor[2, 0])/2,
+                f'qm_polarizability_sos_{int(l)}_yz': (tensor[1, 2]+tensor[2, 1])/2,
             }
             polar_data.update(p_data)
 
@@ -521,7 +530,7 @@ def polarizability_sos(mol, wavelength=None, confId=0, opt=True, work_dir=None, 
             del r['LEFT EIGENVECTOR ALPHA']
             del r['RIGHT EIGENVECTOR BETA']
             del r['LEFT EIGENVECTOR BETA']
-            json_data['Excitation state %i' % (i+1)] = r
+            json_data[f'Excitation state {(i+1)}'] = r
 
         with open(os.path.join(save_dir, td_output), 'w') as fh:
             json.dump(json_data, fh, ensure_ascii=False, indent=4, separators=(',', ': '))
@@ -585,21 +594,21 @@ def refractive_index_sos(mols, density, ratio=None, wavelength=None, confId=0, o
     a_list = []
     for i, mol in enumerate(mols):
         polar_data = polarizability_sos(mol, wavelength=wavelength, confId=confId, opt=opt, work_dir=work_dir, tmp_dir=tmp_dir,
-                                log_name='%s_%i' % (log_name, i), qm_solver=qm_solver, opt_method=opt_method, opt_basis=opt_basis, opt_basis_gen=opt_basis_gen,
+                                log_name=f'{log_name}_{i}', qm_solver=qm_solver, opt_method=opt_method, opt_basis=opt_basis, opt_basis_gen=opt_basis_gen,
                                 geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm,
                                 td_method=td_method, td_basis=td_basis, td_basis_gen=td_basis_gen,
                                 n_state=n_state, p_state=p_state, tda=tda, tdscf_maxiter=tdscf_maxiter, td_output=td_output,
                                 total_charge=total_charge, total_multiplicity=total_multiplicity, **kwargs)
 
         for k, v in polar_data.items():
-            p_data['%s_monomer%i' % (k, i+1)] = v
+            p_data[f'{k}_monomer{(i+1)}'] = v
 
         a_tmp = []
         for l in wavelength:
             if l is None:
                 a_tmp.append(polar_data['qm_polarizability_sos'])
             else:
-                a_tmp.append(polar_data['qm_polarizability_sos_%i' % int(l)])
+                a_tmp.append(polar_data[f'qm_polarizability_sos_{int(l)}'])
         a_list.append(a_tmp)
     a_list = np.array(a_list)
 
@@ -608,7 +617,7 @@ def refractive_index_sos(mols, density, ratio=None, wavelength=None, confId=0, o
         if i is None:
             ri_data['refractive_index_sos'] = calc.refractive_index(a_list[:, i], density, mol_weight, ratio=ratio)
         else:
-            ri_data['refractive_index_sos_%i' % int(l)] = calc.refractive_index(a_list[:, i], density, mol_weight, ratio=ratio)
+            ri_data[f'refractive_index_sos_{int(l)}'] = calc.refractive_index(a_list[:, i], density, mol_weight, ratio=ratio)
 
     ri_data.update(p_data)
 

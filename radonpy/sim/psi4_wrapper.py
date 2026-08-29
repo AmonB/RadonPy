@@ -30,7 +30,7 @@ if const.mpi4py_avail:
     try:
         from mpi4py.futures import MPIPoolExecutor
     except ImportError as e:
-        utils.radon_print('Cannot import mpi4py. Change to const.mpi4py_avail = False. %s' % e, level=2)
+        utils.radon_print(f'Cannot import mpi4py. Change to const.mpi4py_avail = False. {e}', level=2)
         const.mpi4py_avail = False
 
 
@@ -119,7 +119,7 @@ class Psi4w():
         self.error_flag = False
         self._basis_set_construction()
         psi4.set_num_threads(self.num_threads)
-        psi4.set_memory('%i MB' % (self.memory))
+        psi4.set_memory(f'{self.memory} MB')
         psi4.set_options({
             'dft_spherical_points': self.dft_spherical_points,
             'dft_radial_points': self.dft_radial_points,
@@ -151,7 +151,7 @@ class Psi4w():
             qcengine.config.get_global = self.get_global_org
 
         # Avoiding the bug that optimization is failed due to the optimization binary file remaining.
-        opt_bin_file = os.path.join(self.tmp_dir, 'psi.%i.1' % os.getpid())
+        opt_bin_file = os.path.join(self.tmp_dir, f'psi.{os.getpid()}.1')
         if os.path.isfile(opt_bin_file):
             os.remove(opt_bin_file)
 
@@ -169,13 +169,13 @@ class Psi4w():
             Psi4 Mol object
         """
 
-        geom = '%i   %i\n' % (self.charge, self.multiplicity)
+        geom = f'{self.charge}   {self.multiplicity}\n'
         for arg in args:
-            geom += '%s\n' % (arg)
+            geom += f'{arg}\n'
 
         coord = np.array(self.mol.GetConformer(int(self.confId)).GetPositions())
         for i in range(self.mol.GetNumAtoms()):
-            geom += '%2s  % .8f  % .8f  % .8f\n' % (self.mol.GetAtomWithIdx(i).GetSymbol(), coord[i, 0], coord[i, 1], coord[i, 2])
+            geom += f'{self.mol.GetAtomWithIdx(i).GetSymbol():2s}  {coord[i, 0]:.8f}  {coord[i, 1]:.8f}  {coord[i, 2]:.8f}\n'
 
         pmol = psi4.geometry(geom)
         pmol.update_geometry()
@@ -186,11 +186,11 @@ class Psi4w():
 
     def _basis_set_construction(self):
         basis = self.basis.replace('(', '_').replace(')', '_').replace(',', '_').replace('+', 'p').replace('*', 's')
-        bs = 'assign %s\n' % basis
+        bs = f'assign {basis}\n'
 
         for element, basis in self.basis_gen.items():
             basis = basis.replace('(', '_').replace(')', '_').replace(',', '_').replace('+', 'p').replace('*', 's')
-            bs += 'assign %s %s\n' % (element, basis)
+            bs += f'assign {element} {basis}\n'
 
         psi4.basis_helper(bs, name='radonpy_basis', set_option=True)
 
@@ -208,7 +208,7 @@ class Psi4w():
             energy (float, kJ/mol)
         """
 
-        pmol = self._init_psi4(output='./%s_psi4.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4.log')
         dt1 = datetime.datetime.now()
         utils.radon_print('Psi4 single point calculation is running...', level=1)
 
@@ -218,10 +218,10 @@ class Psi4w():
             else:
                 energy = psi4.energy(self.method, molecule=pmol, return_wfn=False, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 single point calculation. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 single point calculation. Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             energy = e.wfn.energy()
             self.error_flag = True
 
@@ -247,7 +247,7 @@ class Psi4w():
             coord (ndarray(float), angstrom)
         """
 
-        pmol = self._init_psi4(output='./%s_psi4_opt.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_opt.log')
 
         if dynamic_level == 0 and calc.find_liner_angle(self.mol) and LooseVersion(psi4.__version__) < LooseVersion('1.8'):
             utils.radon_print('Found a linear angle in the molecule. Psi4 optimization setting \'dynamic_level\' was changed to 2.')
@@ -270,11 +270,11 @@ class Psi4w():
         frozen_dihedral = []
         for atoms in freeze:
             if len(atoms) == 2:
-                frozen_bond.append('%i %i' % (atoms[0]+1, atoms[1]+1))
+                frozen_bond.append(f'{atoms[0]+1} {atoms[1]+1}')
             elif len(atoms) == 3:
-                frozen_angle.append('%i %i %i' % (atoms[0]+1, atoms[1]+1, atoms[2]+1))
+                frozen_angle.append(f'{atoms[0]+1} {atoms[1]+1} {atoms[2]+1}')
             elif len(atoms) == 4:
-                frozen_dihedral.append('%i %i %i %i' % (atoms[0]+1, atoms[1]+1, atoms[2]+1, atoms[3]+1))
+                frozen_dihedral.append(f'{atoms[0]+1} {atoms[1]+1} {atoms[2]+1} {atoms[3]+1}')
             else:
                 utils.radon_print('Illegal length of array for input atoms. (2, 3, or 4)', level=3)
         if len(frozen_bond) > 0:
@@ -294,11 +294,11 @@ class Psi4w():
             else:
                 energy = psi4.optimize(self.method, molecule=pmol, return_wfn=False, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 optimization. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 optimization. Elapsed time = {str(dt2-dt1)}', level=1)
             coord = pmol.geometry().to_array() * const.bohr2ang
 
         except psi4.OptimizationConvergenceError as e:
-            utils.radon_print('Psi4 optimization convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 optimization convergence error. {e}', level=2)
             if ignore_conv_error:
                 energy = e.wfn.energy()
             else:
@@ -307,7 +307,7 @@ class Psi4w():
             self.error_flag = True
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             if ignore_conv_error:
                 energy = e.wfn.energy()
             else:
@@ -318,7 +318,7 @@ class Psi4w():
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 optimization. %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 optimization. {e}', level=3)
 
         self._fin_psi4()
 
@@ -366,19 +366,19 @@ class Psi4w():
         }
 
         if len(atoms) == 2:
-            opt_dict['OPTKING__FROZEN_DISTANCE'] = '%i %i' % (atoms[0]+1, atoms[1]+1)
+            opt_dict['OPTKING__FROZEN_DISTANCE'] = f'{atoms[0]+1} {atoms[1]+1}'
             scan_type = 'bond length'
         elif len(atoms) == 3:
-            opt_dict['OPTKING__FROZEN_BEND'] = '%i %i %i' % (atoms[0]+1, atoms[1]+1, atoms[2]+1)
+            opt_dict['OPTKING__FROZEN_BEND'] = f'{atoms[0]+1} {atoms[1]+1} {atoms[2]+1}'
             scan_type = 'bond angle'
         elif len(atoms) == 4:
-            opt_dict['OPTKING__FROZEN_DIHEDRAL'] = '%i %i %i %i' % (atoms[0]+1, atoms[1]+1, atoms[2]+1, atoms[3]+1)
+            opt_dict['OPTKING__FROZEN_DIHEDRAL'] = f'{atoms[0]+1} {atoms[1]+1} {atoms[2]+1} {atoms[3]+1}'
             scan_type = 'dihedral angle'
         else:
             utils.radon_print('Illegal length of array for input atoms. (2, 3, or 4)', level=3)
 
         dt1 = datetime.datetime.now()
-        utils.radon_print('Psi4 scan (%s) is running...' % scan_type, level=1)
+        utils.radon_print(f'Psi4 scan ({scan_type}) is running...', level=1)
 
         for v in values:
             log_name = None
@@ -386,31 +386,31 @@ class Psi4w():
 
             if len(atoms) == 2:
                 Chem.rdMolTransforms.SetBondLength(conf, atoms[0], atoms[1], float(v))
-                log_name = './%s_psi4_scan%i-%i_%f.log' % (self.name, atoms[0], atoms[1], float(v))
+                log_name = f'./{self.name}_psi4_scan{atoms[0]}-{atoms[1]}_{float(v)}.log'
             elif len(atoms) == 3:
                 Chem.rdMolTransforms.SetAngleDeg(conf, atoms[0], atoms[1], atoms[2], float(v))
-                log_name = './%s_psi4_scan%i-%i-%i_%i.log' % (self.name, atoms[0], atoms[1], atoms[2], int(v))
+                log_name = f'./{self.name}_psi4_scan{atoms[0]}-{atoms[1]}-{atoms[2]}_{float(v)}.log'
             elif len(atoms) == 4:
                 Chem.rdMolTransforms.SetDihedralDeg(conf, atoms[0], atoms[1], atoms[2], atoms[3], float(v))
-                log_name = './%s_psi4_scan%i-%i-%i-%i_%i.log' % (self.name, atoms[0], atoms[1], atoms[2], atoms[3], int(v))
-            
+                log_name = f'./{self.name}_psi4_scan{atoms[0]}-{atoms[1]}-{atoms[2]}-{atoms[3]}_{float(v)}.log'
+
             pmol = self._init_psi4('symmetry c1', output=log_name)
             psi4.set_options(opt_dict)
 
             try:
                 if opt:
-                    utils.radon_print('Psi4 optimization (%s = %f) is running...' % (scan_type, float(v)), level=1)
+                    utils.radon_print(f'Psi4 optimization ({scan_type} = {float(v)}) is running...', level=1)
                     dt3 = datetime.datetime.now()
                     energy = psi4.optimize(self.method, molecule=pmol, return_wfn=False, **kwargs)
                     dt4 = datetime.datetime.now()
-                    utils.radon_print('Normal termination of psi4 optimization. Elapsed time = %s' % str(dt4-dt3), level=1)
+                    utils.radon_print(f'Normal termination of psi4 optimization. Elapsed time = {str(dt4-dt3)}', level=1)
                     coord = pmol.geometry().to_array() * const.bohr2ang
                 else:
                     energy = psi4.energy(self.method, molecule=pmol, return_wfn=False, **kwargs)
                     coord = pmol.geometry().to_array() * const.bohr2ang
 
             except psi4.OptimizationConvergenceError as e:
-                utils.radon_print('Psi4 optimization convergence error. %s' % e, level=2)
+                utils.radon_print(f'Psi4 optimization convergence error. {e}', level=2)
                 if ignore_conv_error:
                     energy = e.wfn.energy()
                 else:
@@ -419,7 +419,7 @@ class Psi4w():
                 self.error_flag = True
 
             except psi4.SCFConvergenceError as e:
-                utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+                utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
                 if ignore_conv_error:
                     energy = e.wfn.energy()
                 else:
@@ -430,7 +430,7 @@ class Psi4w():
             except BaseException as e:
                 self._fin_psi4()
                 self.error_flag = True
-                utils.radon_print('Error termination of psi4 optimization. %s' % e, level=3)
+                utils.radon_print(f'Error termination of psi4 optimization. {e}', level=3)
 
             energies = np.append(energies, energy)
             coords.append(coord)
@@ -445,7 +445,7 @@ class Psi4w():
             self._fin_psi4()
 
         dt2 = datetime.datetime.now()
-        utils.radon_print('Normal termination of psi4 scan. Elapsed time = %s' % str(dt2-dt1), level=1)
+        utils.radon_print(f'Normal termination of psi4 scan. Elapsed time = {str(dt2-dt1)}', level=1)
 
         return energies*const.au2kj, np.array(coords) # Hartree -> kJ/mol
 
@@ -463,7 +463,7 @@ class Psi4w():
             force (float, kJ/(mol angstrom))
         """
 
-        pmol = self._init_psi4(output='./%s_psi4_force.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_force.log')
         dt1 = datetime.datetime.now()
         utils.radon_print('Psi4 force calculation is running...', level=1)
 
@@ -473,17 +473,17 @@ class Psi4w():
             else:
                 grad = psi4.gradient(self.method, molecule=pmol, return_wfn=False, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 force calculation. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 force calculation. Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             grad = e.wfn.gradient()
             self.error_flag = True
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 force calculation. %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 force calculation. {e}', level=3)
 
         self._fin_psi4()
 
@@ -503,7 +503,7 @@ class Psi4w():
             energy (float, kJ/mol)
         """
 
-        pmol = self._init_psi4(output='./%s_psi4_freq.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_freq.log')
         dt1 = datetime.datetime.now()
         utils.radon_print('Psi4 frequency calculation is running...')
 
@@ -513,17 +513,17 @@ class Psi4w():
             else:
                 energy = psi4.frequency(self.method, molecule=pmol, return_wfn=False, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 frequency calculation. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 frequency calculation. Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             energy = e.wfn.energy()
             self.error_flag = True
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 frequency calculation. %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 frequency calculation. {e}', level=3)
 
         self._fin_psi4()
 
@@ -543,7 +543,7 @@ class Psi4w():
             hessian (float, kJ/(mol angstrom**2))
         """
 
-        pmol = self._init_psi4(output='./%s_psi4_hessian.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_hessian.log')
         dt1 = datetime.datetime.now()
         utils.radon_print('Psi4 hessian calculation is running...', level=1)
 
@@ -553,17 +553,17 @@ class Psi4w():
             else:
                 hessian = psi4.hessian(self.method, molecule=pmol, return_wfn=False, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 hessian calculation. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 hessian calculation. Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             hessian = e.wfn.hessian()
             self.error_flag = True
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 hessian calculation. %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 hessian calculation. {e}', level=3)
 
         self._fin_psi4()
 
@@ -589,10 +589,10 @@ class Psi4w():
             TD-DFT result
         """
         if LooseVersion(psi4.__version__) < LooseVersion('1.3.100'):
-            utils.radon_print('TD-DFT calclation is not implemented in Psi4 of this version (%s).' % str(psi4.__version__), level=3)
+            utils.radon_print(f'TD-DFT calclation is not implemented in Psi4 of this version ({str(psi4.__version__)}).', level=3)
             return []
 
-        pmol = self._init_psi4(output='./%s_psi4_tddft.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_tddft.log')
         psi4.set_options({
             'wcombine': False,
             'save_jk': True,
@@ -609,26 +609,26 @@ class Psi4w():
             if p_state is not None:
                 if 0.0 < p_state <= 1.0:
                     n_state = int(max_n_states * p_state)
-                    utils.radon_print('n_state of Psi4 TD-DFT calculation set to %i.' % n_state, level=1)
+                    utils.radon_print(f'n_state of Psi4 TD-DFT calculation set to {n_state}.', level=1)
                 else:
-                    utils.radon_print('p_state=%f of Psi4 TD-DFT calculation is out of range (0.0 < p_state <= 1.0).' % float(p_state), level=3)
+                    utils.radon_print(f'p_state={float(p_state)} of Psi4 TD-DFT calculation is out of range (0.0 < p_state <= 1.0).', level=3)
             elif n_state > max_n_states or n_state < 0:
-                utils.radon_print('n_state of Psi4 TD-DFT calculation set to %i.' % max_n_states, level=1)
+                utils.radon_print(f'n_state of Psi4 TD-DFT calculation set to {max_n_states}.', level=1)
                 n_state = max_n_states
             res = psi4.procrouting.response.scf_response.tdscf_excitations(self.wfn, states=n_state)
 
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 TD-DFT calculation. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 TD-DFT calculation. Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             res = []
             self.error_flag = True
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 TD-DFT calculation. %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 TD-DFT calculation. {e}', level=3)
 
         self._fin_psi4()
 
@@ -688,7 +688,7 @@ class Psi4w():
             defv_dict = {ptab.GetElementSymbol(n).upper(): ptab.GetDefaultValence(n) if ptab.GetDefaultValence(n) >= 0 else 0 for n in range(1, 119)}
             psi4.qcdb.parker._expected_bonds = {**defv_dict, **psi4.qcdb.parker._expected_bonds} 
 
-        pmol = self._init_psi4(output='./%s_psi4_resp.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_resp.log')
 
         # Make a dict of vdW radii
         except_list = set([1, 6, 7, 8, 9, 15, 16, 17])  # H, C, N, O, F, P, S, Cl
@@ -726,23 +726,23 @@ class Psi4w():
             # Add c for atoms fixed in second stage
             if LooseVersion(resp.__version__) >= LooseVersion('0.8'):
                 resp.stage2_helper.set_stage2_constraint(pmol, charges1[1], options)
-                if os.path.isfile('./1_%s_grid.dat' % pmol.name()):
-                    options['grid'] = ['./1_%s_grid.dat' % pmol.name()]
+                if os.path.isfile(f'./1_{pmol.name()}_grid.dat'):
+                    options['grid'] = [f'./1_{pmol.name()}_grid.dat']
                 else:
                     options['grid'] = ['./grid.dat']
-                if os.path.isfile('./1_%s_grid_esp.dat' % pmol.name()):
-                    options['esp'] = ['./1_%s_grid_esp.dat' % pmol.name()]
+                if os.path.isfile(f'./1_{pmol.name()}_grid_esp.dat'):
+                    options['esp'] = [f'./1_{pmol.name()}_grid_esp.dat']
                 else:
                     options['grid'] = ['./grid_esp.dat']
             else:
                 helper = resp.stage2_helper()
                 helper.set_stage2_constraint(pmol, charges1[1], options)
-                options['grid'] = './1_%s_grid.dat' % pmol.name()
-                options['esp'] = './1_%s_grid_esp.dat' % pmol.name()
+                options['grid'] = f'./1_{pmol.name()}_grid.dat'
+                options['esp'] = f'./1_{pmol.name()}_grid_esp.dat'
         
             # Second stage
             utils.radon_print('Second stage of RESP charge calculation', level=0)
-            psi4.core.set_output_file('./%s_psi4_resp.log' % self.name, True)
+            psi4.core.set_output_file(f'./{self.name}_psi4_resp.log', True)
             if resp.resp.__code__.co_argcount == 2:
                 charges2 = resp.resp([pmol], options)
             else:
@@ -750,17 +750,17 @@ class Psi4w():
 
             charges2 = np.array(charges2)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 RESP charge calculation. Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 RESP charge calculation. Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             charges2 = np.array([np.nan for x in range(self.mol.GetNumAtoms())])
             self.error_flag = True
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 RESP charge calculation. %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 RESP charge calculation. {e}', level=3)
 
         self._fin_psi4()
 
@@ -786,7 +786,7 @@ class Psi4w():
         """
 
         if self.wfn is None or recalc:
-            pmol = self._init_psi4(output='./%s_psi4.log' % self.name)
+            pmol = self._init_psi4(output=f'./{self.name}_psi4.log')
             energy, self.wfn = psi4.energy(self.method, molecule=pmol, return_wfn=True, **kwargs)
             self._fin_psi4()
 
@@ -813,7 +813,7 @@ class Psi4w():
         """
 
         if self.wfn is None or recalc:
-            pmol = self._init_psi4(output='./%s_psi4.log' % self.name)
+            pmol = self._init_psi4(output=f'./{self.name}_psi4.log')
             energy, self.wfn = psi4.energy(self.method, molecule=pmol, return_wfn=True, **kwargs)
             self._fin_psi4()
 
@@ -904,7 +904,7 @@ class Psi4w():
             for i, e in enumerate([eps, -eps]):
                 for j, ax in enumerate(['x', 'y', 'z']):
                     try:
-                        psi4.core.set_output_file('./%s_psi4_polar_%s%i.log' % (self.name, ax, i), False)
+                        psi4.core.set_output_file(f'./{self.name}_psi4_polar_{ax}{i}.log', False)
                         divec = [0.0, 0.0, 0.0]
                         divec[j] = e
                         psi4.set_options({'perturb_dipole': divec})
@@ -918,14 +918,14 @@ class Psi4w():
                             p_mu[i, j] = np.array(psi4.variable('SCF DIPOLE'))
 
                     except psi4.SCFConvergenceError as e:
-                        utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+                        utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
                         p_mu[i, j] = np.array([np.nan, np.nan, np.nan])
                         self.error_flag = True
 
                     except BaseException as e:
                         self._fin_psi4()
                         self.error_flag = True
-                        utils.radon_print('Error termination of psi4 polarizability calculation (finite field). %s' % e, level=3)
+                        utils.radon_print(f'Error termination of psi4 polarizability calculation (finite field). {e}', level=3)
             self._fin_psi4()
 
         a_conv = 1.648777e-41    # a.u. -> C^2 m^2 J^-1
@@ -938,7 +938,7 @@ class Psi4w():
             utils.radon_print('Psi4 polarizability calculation (finite field) failure.', level=2)
         else:
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 polarizability calculation (finite field). Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 polarizability calculation (finite field). Elapsed time = {str(dt2-dt1)}', level=1)
 
         return alpha, d_mu
 
@@ -959,7 +959,7 @@ class Psi4w():
             Static or dynamic dipole polarizability (ndarray, angstrom^3)
         """
             
-        pmol = self._init_psi4(output='./%s_psi4_cc2polar.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_cc2polar.log')
         if len(omega) > 0:
             omega.append(unit)
             psi4.set_options({'omega': omega})
@@ -970,17 +970,17 @@ class Psi4w():
         try:
             energy, self.cc2wfn = psi4.properties(method, properties=['polarizability'], molecule=pmol, return_wfn=True, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 polarizability calculation (CC linear response). Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 polarizability calculation (CC linear response). Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             self.error_flag = True
             return [np.nan]
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 polarizability calculation (CC linear response). %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 polarizability calculation (CC linear response). {e}', level=3)
 
         self._fin_psi4()
 
@@ -1004,12 +1004,12 @@ class Psi4w():
                 elif unit == 'HZ' or unit == 'hz':
                     lamda = round( const.c / omega[i] * 1e9 )
                 else:
-                    utils.radon_print('Illeagal input of unit = %s in cc2_polar.' % str(unit), level=3)
+                    utils.radon_print(f'Illeagal input of unit = {str(unit)} in cc2_polar.', level=3)
 
                 if method == 'cc2' or method == 'CC2':
-                    alpha.append( psi4.variable('CC2 DIPOLE POLARIZABILITY @ %iNM' % lamda) * pv )
+                    alpha.append( psi4.variable(f'CC2 DIPOLE POLARIZABILITY @ {lamda}NM') * pv )
                 elif method == 'ccsd' or method == 'CCSD':
-                    alpha.append( psi4.variable('CCSD DIPOLE POLARIZABILITY @ %iNM' % lamda) * pv )
+                    alpha.append( psi4.variable(f'CCSD DIPOLE POLARIZABILITY @ {lamda}NM') * pv )
 
         return np.array(alpha)
 
@@ -1023,7 +1023,7 @@ class Psi4w():
         Returns:
             Static dipole polarizability (ndarray, angstrom^3)
         """            
-        pmol = self._init_psi4(output='./%s_psi4_cphfpolar.log' % self.name)
+        pmol = self._init_psi4(output=f'./{self.name}_psi4_cphfpolar.log')
 
         dt1 = datetime.datetime.now()
         utils.radon_print('Psi4 polarizability calculation (CPHF/CPKS) is running...', level=1)
@@ -1031,24 +1031,24 @@ class Psi4w():
         try:
             energy, self.wfn = psi4.properties(self.method, properties=['DIPOLE_POLARIZABILITIES'], molecule=pmol, return_wfn=True, **kwargs)
             dt2 = datetime.datetime.now()
-            utils.radon_print('Normal termination of psi4 polarizability calculation (CPHF/CPKS). Elapsed time = %s' % str(dt2-dt1), level=1)
+            utils.radon_print(f'Normal termination of psi4 polarizability calculation (CPHF/CPKS). Elapsed time = {str(dt2-dt1)}', level=1)
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             pol = np.full((6), np.nan)
             self.error_flag = True
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 polarizability calculation (CPHF/CPKS). %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 polarizability calculation (CPHF/CPKS). {e}', level=3)
 
         self._fin_psi4()
 
         a_conv = 1.648777e-41 # a.u. -> C^2 m^2 J^-1
         pv = (a_conv*const.m2ang**3)/(4*np.pi*const.eps0) # C^2 m^2 J^-1 -> angstrom^3 (polarizability volume)
 
-        pol = np.array([psi4.variable('DIPOLE POLARIZABILITY %s' % ax) * pv for ax in ['XX', 'YY', 'ZZ', 'XY', 'XZ', 'YZ']])
+        pol = np.array([psi4.variable(f'DIPOLE POLARIZABILITY {ax}') * pv for ax in ['XX', 'YY', 'ZZ', 'XY', 'XZ', 'YZ']])
         alpha = np.mean(pol[:3])
         tensor = np.array([[pol[0], pol[3], pol[4]], [pol[3], pol[1], pol[5]], [pol[4], pol[5], pol[2]]])
 
@@ -1079,7 +1079,7 @@ class Psi4w():
         # Calculate Non-perturbed dipole moment
         np_mu = np.zeros((3))
         try:
-            psi4.core.set_output_file('./%s_psi4_hyperpolar.log' % (self.name), False)
+            psi4.core.set_output_file(f'./{self.name}_psi4_hyperpolar.log', False)
             energy_x, wfn = psi4.energy(self.method, molecule=pmol, return_wfn=True, **kwargs)
             psi4.oeprop(wfn, 'DIPOLE')
             if LooseVersion(psi4.__version__) < LooseVersion('1.3.100'):
@@ -1090,14 +1090,14 @@ class Psi4w():
                 np_mu = np.array(psi4.variable('SCF DIPOLE'))
 
         except psi4.SCFConvergenceError as e:
-            utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+            utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
             self.error_flag = True
             np_mu = np.full((3), np.nan)
 
         except BaseException as e:
             self._fin_psi4()
             self.error_flag = True
-            utils.radon_print('Error termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). %s' % e, level=3)
+            utils.radon_print(f'Error termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). {e}', level=3)
 
         self._fin_psi4()
 
@@ -1154,7 +1154,7 @@ class Psi4w():
             for i, e in enumerate([eps, -eps]):
                 for j, ax in enumerate(['x', 'y', 'z']):
                     try:
-                        psi4.core.set_output_file('./%s_psi4_hyperpolar_%s%i.log' % (self.name, ax, i), False)
+                        psi4.core.set_output_file(f'./{self.name}_psi4_hyperpolar_{ax}{i}.log', False)
                         divec = [0.0, 0.0, 0.0]
                         divec[j] = e
                         psi4.set_options({'perturb_dipole': divec})
@@ -1167,14 +1167,14 @@ class Psi4w():
                         p_alpha[i, j, 1, 2] = p_alpha[i, j, 2, 1] = psi4.variable('DIPOLE POLARIZABILITY YZ')
 
                     except psi4.SCFConvergenceError as e:
-                        utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+                        utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
                         p_alpha[i, j] = np.full((3,3), np.nan)
                         self.error_flag = True
 
                     except BaseException as e:
                         self._fin_psi4()
                         self.error_flag = True
-                        utils.radon_print('Error termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). %s' % e, level=3)
+                        utils.radon_print(f'Error termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). {e}', level=3)
             self._fin_psi4()
 
         tensor = -(p_alpha[0] - p_alpha[1]) / (2*eps)
@@ -1188,7 +1188,7 @@ class Psi4w():
         else:
             dt2 = datetime.datetime.now()
             utils.radon_print(
-                'Normal termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). Elapsed time = %s' % str(dt2-dt1),
+                f'Normal termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). Elapsed time = {str(dt2-dt1)}',
                 level=1)
 
         return beta, tensor
@@ -1465,10 +1465,10 @@ def _polar_mp_worker(args):
     j = 0 if ax == 'x' else 1 if ax == 'y' else 2 if ax == 'z' else np.nan
     error_flag = False
 
-    utils.radon_print('Worker process %s%i start on %s. PID: %i' % (ax, i, socket.gethostname(), os.getpid()))
+    utils.radon_print(f'Worker process {ax}{i} start on {socket.gethostname()}. PID: {os.getpid()}')
 
     utils.restore_picklable(psi4obj.mol)
-    pmol = psi4obj._init_psi4('symmetry c1', output='./%s_psi4_polar_%s%i.log' % (psi4obj.name, ax, i))
+    pmol = psi4obj._init_psi4('symmetry c1', output=f'./{psi4obj.name}_psi4_polar_{ax}{i}.log')
     divec = [0.0, 0.0, 0.0]
     divec[j] = eps
     psi4.set_options({
@@ -1490,14 +1490,14 @@ def _polar_mp_worker(args):
             dipole = np.array(psi4.variable('SCF DIPOLE'))
 
     except psi4.SCFConvergenceError as e:
-        utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+        utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
         dipole = np.full((3), np.nan)
         error_flag = True
 
     except BaseException as e:
         psi4obj._fin_psi4()
         error_flag = True
-        utils.radon_print('Error termination of psi4 polarizability calculation (finite field). %s' % e, level=3)
+        utils.radon_print(f'Error termination of psi4 polarizability calculation (finite field). {e}', level=3)
 
     psi4obj._fin_psi4()
 
@@ -1512,10 +1512,10 @@ def _cphf_hyperpolar_mp_worker(args):
     j = 0 if ax == 'x' else 1 if ax == 'y' else 2 if ax == 'z' else np.nan
     error_flag = False
 
-    utils.radon_print('Worker process %s%i start on %s. PID: %i' % (ax, i, socket.gethostname(), os.getpid()))
+    utils.radon_print(f'Worker process {ax}{i} start on {socket.gethostname()}. PID: {os.getpid()}')
 
     utils.restore_picklable(psi4obj.mol)
-    pmol = psi4obj._init_psi4('symmetry c1', output='./%s_psi4_hyperpolar_%s%i.log' % (psi4obj.name, ax, i))
+    pmol = psi4obj._init_psi4('symmetry c1', output=f'./{psi4obj.name}_psi4_hyperpolar_{ax}{i}.log')
     divec = [0.0, 0.0, 0.0]
     divec[j] = eps
     psi4.set_options({
@@ -1536,14 +1536,14 @@ def _cphf_hyperpolar_mp_worker(args):
         alpha[1, 2] = alpha[2, 1] = psi4.variable('DIPOLE POLARIZABILITY YZ')
 
     except psi4.SCFConvergenceError as e:
-        utils.radon_print('Psi4 SCF convergence error. %s' % e, level=2)
+        utils.radon_print(f'Psi4 SCF convergence error. {e}', level=2)
         alpha = np.full((3,3), np.nan)
         error_flag = True
 
     except BaseException as e:
         psi4obj._fin_psi4()
         error_flag = True
-        utils.radon_print('Error termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). %s' % e, level=3)
+        utils.radon_print(f'Error termination of psi4 first hyperpolarizability calculation (CPHF/CPKS & finite field). {e}', level=3)
 
     psi4obj._fin_psi4()
 

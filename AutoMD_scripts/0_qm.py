@@ -46,6 +46,13 @@ if __name__ == '__main__':
     omp_psi4 = int(os.environ.get('RadonPy_OMP_Psi4', 4))
     mem_psi4 = int(os.environ.get('RadonPy_MEM_Psi4', 1000))
 
+    opt_basis = os.environ.get('RadonPy_QM_Basis', 'def2-TZVP'),
+    opt_basis_gen = os.environ.get('RadonPy_QM_Basis_Gen', {'Br': 'def2-TZVP', 'I': 'def2-TZVP'}),
+    sp_basis =  os.environ.get('RadonPy_SP_Basis', 'def2-TZVPP'),
+    sp_basis_gen = os.environ.get('RadonPy_QM_Basis_Gen', {'Br': 'def2-TZVPP', 'I': 'def2-TZVPP'}),
+    polar_basis = os.environ.get('RadonPy_POLAR_Basis', 'def2-TZVPPD'),
+    polar_basis_gen = {'Br': 'def2-TZVPPD', 'I': 'def2-TZVPPD'},
+
     conf_mm_omp = int(os.environ.get('RadonPy_Conf_MM_OMP', 1))
     conf_mm_mpi = int(os.environ.get('RadonPy_Conf_MM_MPI', utils.cpu_count()))
     conf_mm_gpu = int(os.environ.get('RadonPy_Conf_MM_GPU', 0))
@@ -57,7 +64,7 @@ if __name__ == '__main__':
     do_tddft = bool(os.environ.get('RadonPy_Do_TDDFT', False)=='True')
 
 
-    work_dir = './%s' % data['DBID']
+    work_dir = f"./{data['DBID']}"
     if not os.path.isdir(work_dir):
         os.makedirs(work_dir)
     save_dir = os.path.join(work_dir, 'analyze')
@@ -83,7 +90,7 @@ if __name__ == '__main__':
     elif data['forcefield'] == 'Dreiding_UT':
         ff = Dreiding_UT()
     else:
-        raise ValueError("Force field %s is not available." % data['forcefield'])
+        raise ValueError(f"Force field {data['forcefield']} is not available.")
 
     for i, smi in enumerate(smi_list):
         monomer_data = {
@@ -93,23 +100,27 @@ if __name__ == '__main__':
             'remarks': data['remarks'],
             **helper.get_version(),
         }
-        data['smiles_%i' % (i+1)] = smi
+        data[f'smiles_{(i+1)}'] = smi
 
         # Conformation search and RESP charge calculation of a repeating unit
         mol = utils.mol_from_smiles(smi)
-        mol, energy = qm.conformation_search(mol, ff=ff, work_dir=work_dir, tmp_dir=tmp_dir, opt_method=data['qm_method'],
-            psi4_omp=conf_psi4_omp, psi4_mp=conf_psi4_mp, mpi=conf_mm_mpi, omp=conf_mm_omp, gpu=conf_mm_gpu,
-            mm_mp=conf_mm_mp, log_name='monomer%i' % (i+1), memory=mem_psi4)
-        qm.assign_charges(mol, charge=data['charge'], work_dir=work_dir, tmp_dir=tmp_dir, omp=omp_psi4, opt=False, log_name='monomer%i' % (i+1), memory=mem_psi4)
+        mol, energy = qm.conformation_search(mol, ff=ff, work_dir=work_dir, tmp_dir=tmp_dir,
+                                             opt_method=data['qm_method'], opt_basis=opt_basis, opt_basis_gen=opt_basis_gen,
+                                             psi4_omp=conf_psi4_omp, psi4_mp=conf_psi4_mp, mpi=conf_mm_mpi,
+                                             omp=conf_mm_omp, gpu=conf_mm_gpu, mm_mp=conf_mm_mp,
+                                             log_name=f'monomer{i+1}', memory=mem_psi4)
+        qm.assign_charges(mol, charge=data['charge'], work_dir=work_dir, tmp_dir=tmp_dir,
+                          charge_method=data['qm_method'], charge_basis=sp_basis, charge_basis_gen=sp_basis_gen,
+                          omp=omp_psi4, opt=False, log_name=f'monomer{i+1}', memory=mem_psi4)
 
         # Dump pickle file
         if data['monomer_ID']:
-            data['monomer_ID_%i' % (i+1)] = monomer_data['monomer_ID'] = monomer_id[i]
-            utils.pickle_dump(mol, os.path.join(save_dir, 'monomer_%s.pickle' % monomer_id[i]))
-            utils.MolToJSON(mol, os.path.join(save_dir, 'monomer_%s.json' % monomer_id[i]))
+            data[f'monomer_ID_{(i+1)}'] = monomer_data['monomer_ID'] = monomer_id[i]
+            utils.pickle_dump(mol, os.path.join(save_dir, f'monomer_{monomer_id[i]}.pickle'))
+            utils.MolToJSON(mol, os.path.join(save_dir, f'monomer_{monomer_id[i]}.json'))
         else:
-            utils.pickle_dump(mol, os.path.join(save_dir, 'monomer%i.pickle' % (i+1)))
-            utils.MolToJSON(mol, os.path.join(save_dir, 'monomer%i.json' % (i+1)))
+            utils.pickle_dump(mol, os.path.join(save_dir, f'monomer{(i+1)}.pickle'))
+            utils.MolToJSON(mol, os.path.join(save_dir, f'monomer{(i+1)}.json'))
 
         # Get monomer properties
         update = {
@@ -121,38 +132,49 @@ if __name__ == '__main__':
         data, monomer_data = io.update_monomer_data(update, data, monomer_data, monomer_idx=i)
 
         # Single point calculation
-        sp_data = qm.sp_prop(mol, opt=False, work_dir=work_dir, tmp_dir=tmp_dir, sp_method=data['qm_method'],
-                            omp=omp_psi4, log_name='monomer%i' % (i+1), memory=mem_psi4)
+        sp_data = qm.sp_prop(mol, opt=False, work_dir=work_dir, tmp_dir=tmp_dir,
+                             sp_method=data['qm_method'], sp_basis=sp_basis, sp_basis_gen=sp_basis_gen,
+                             dipole_basis=polar_basis, dipole_basis_gen=polar_basis_gen,
+                             omp=omp_psi4, log_name=f'monomer{i+1}', memory=mem_psi4)
         data, monomer_data = io.update_monomer_data(sp_data, data, monomer_data, monomer_idx=i)
 
         # Polarizability calculation
-        polar_data = qm.polarizability(mol, opt=False, work_dir=work_dir, tmp_dir=tmp_dir, polar_method=data['qm_method'], omp=conf_psi4_omp, mp=conf_psi4_mp,
-                                        log_name='monomer%i' % (i+1), memory=mem_psi4)
+        polar_data = qm.polarizability(mol, opt=False, work_dir=work_dir, tmp_dir=tmp_dir,
+                                       polar_method=data['qm_method'], polar_basis=polar_basis, polar_basis_gen=polar_basis_gen,
+                                       omp=conf_psi4_omp, mp=conf_psi4_mp, log_name=f'monomer{i+1}', memory=mem_psi4)
         data, monomer_data = io.update_monomer_data(polar_data, data, monomer_data, monomer_idx=i)
 
         if do_tddft:
             # Frequency dependent polarizability calculation
-            fd_polar_data = qm.polarizability_sos(mol, wavelength=[486, 589, 656], p_state=0.003, opt=False, work_dir=work_dir, save_dir=save_dir, tmp_dir=tmp_dir,
-                                            td_method=data['qm_td_method'], omp=conf_psi4_omp, mp=conf_psi4_mp, log_name='monomer%i' % (i+1), memory=mem_psi4)
+            fd_polar_data = qm.polarizability_sos(mol, wavelength=[486, 589, 656], p_state=0.003, opt=False,
+                                                  work_dir=work_dir, save_dir=save_dir, tmp_dir=tmp_dir,
+                                                  td_method=data['qm_td_method'], td_basis=polar_basis, td_basis_gen=polar_basis_gen,
+                                                  omp=conf_psi4_omp, mp=conf_psi4_mp, log_name=f'monomer{i+1}', memory=mem_psi4)
             data, monomer_data = io.update_monomer_data(fd_polar_data, data, monomer_data, monomer_idx=i)
 
 
     if do_ter:
         ter1 = utils.mol_from_smiles(data['smiles_ter_1'])
-        qm.assign_charges(ter1, charge=data['charge'], work_dir=work_dir, tmp_dir=tmp_dir, opt_method=data['qm_method'], omp=omp_psi4, log_name='ter1', memory=mem_psi4)
+        qm.assign_charges(ter1, charge=data['charge'], work_dir=work_dir, tmp_dir=tmp_dir,
+                          opt_method=data['qm_method'], opt_basis=opt_basis, opt_basis_gen=opt_basis_gen,
+                          charge_method=data['qm_method'], charge_basis=sp_basis, charge_basis_gen=sp_basis_gen,
+                          omp=omp_psi4, log_name='ter1', memory=mem_psi4)
         if data['ter_ID_1']:
-            utils.pickle_dump(ter1, os.path.join(save_dir, 'ter_%s.pickle' % data['ter_ID_1']))
-            utils.MolToJSON(ter1, os.path.join(save_dir, 'ter_%s.json' % data['ter_ID_1']))
+            utils.pickle_dump(ter1, os.path.join(save_dir, f"ter_{data['ter_ID_1']}.pickle"))
+            utils.MolToJSON(ter1, os.path.join(save_dir, f"ter_{data['ter_ID_1']}.json"))
         else:
             utils.pickle_dump(ter1, os.path.join(save_dir, 'ter1.pickle'))
             utils.MolToJSON(ter1, os.path.join(save_dir, 'ter1.json'))
 
         if data['smiles_ter_2'] is not None:
             ter2 = utils.mol_from_smiles(data['smiles_ter_2'])
-            qm.assign_charges(ter2, charge=data['charge'], work_dir=work_dir, tmp_dir=tmp_dir, opt_method=data['qm_method'], omp=omp_psi4, log_name='ter2', memory=mem_psi4)
+            qm.assign_charges(ter2, charge=data['charge'], work_dir=work_dir, tmp_dir=tmp_dir,
+                              opt_method=data['qm_method'], opt_basis=opt_basis, opt_basis_gen=opt_basis_gen,
+                              charge_method=data['qm_method'], charge_basis=sp_basis, charge_basis_gen=sp_basis_gen,
+                              omp=omp_psi4, log_name='ter2', memory=mem_psi4)
             if data['ter_ID_2']:
-                utils.pickle_dump(ter2, os.path.join(save_dir, 'ter_%s.pickle' % data['ter_ID_2']))
-                utils.MolToJSON(ter2, os.path.join(save_dir, 'ter_%s.json' % data['ter_ID_2']))
+                utils.pickle_dump(ter2, os.path.join(save_dir, f"ter_{data['ter_ID_2']}.pickle"))
+                utils.MolToJSON(ter2, os.path.join(save_dir, f"ter_{data['ter_ID_2']}.json"))
             else:
                 utils.pickle_dump(ter2, os.path.join(save_dir, 'ter2.pickle'))
                 utils.pickle_dump(ter2, os.path.join(save_dir, 'ter2.json'))

@@ -69,7 +69,7 @@ if __name__ == '__main__':
     del_traj = bool(os.environ.get('RadonPy_Del_Traj', False) == 'True')
 
 
-    work_dir = './%s' % data['DBID']
+    work_dir = f"./{data['DBID']}"
     if not os.path.isdir(work_dir):
         os.makedirs(work_dir)
     save_dir = os.path.join(work_dir, 'analyze')
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         'retry_step': 200,
         'retry_opt_step': 5,
         'mp': 4,
-        'omp': opm,
+        'omp': omp,
         'mpi': mpi,
         'gpu': gpu,
         'work_dir': tmp_dir,
@@ -118,7 +118,7 @@ if __name__ == '__main__':
     elif data['forcefield'] == 'Dreiding_UT':
         ff = Dreiding_UT()
     else:
-        raise ValueError("Force field %s is not available." % data['forcefield'])
+        raise ValueError(f"Force field {data['forcefield']} is not available.")
 
     n = poly.calc_n_from_num_atoms(mols, data['input_natom'], ratio=ratio, terminal1=ter, terminal2=ter2)
     data['DP'] = n
@@ -158,8 +158,8 @@ if __name__ == '__main__':
                 result = ff.ff_assign(copoly_list[i])
                 if not result:
                     data['remarks'] += '[ERROR: Can not assign force field parameters.]'
-                utils.MolToJSON(copoly_list[i], os.path.join(save_dir, 'polymer%i.json' % i))
-                utils.pickle_dump(copoly_list[i], os.path.join(save_dir, 'polymer%i.pickle' % i))
+                utils.MolToJSON(copoly_list[i], os.path.join(save_dir, f'polymer{i}.json'))
+                utils.pickle_dump(copoly_list[i], os.path.join(save_dir, f'polymer{i}.pickle'))
 
             data['tacticity'] = poly.get_tacticity(copoly_list[0])
 

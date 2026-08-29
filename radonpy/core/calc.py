@@ -50,7 +50,7 @@ if const.mpi4py_avail:
     try:
         from mpi4py.futures import MPIPoolExecutor
     except ImportError as e:
-        utils.radon_print('Cannot import mpi4py. Change to const.mpi4py_avail = False. %s' % e, level=2)
+        utils.radon_print(f'Cannot import mpi4py. Change to const.mpi4py_avail = False. {e}', level=2)
         const.mpi4py_avail = False
 
 
@@ -443,7 +443,7 @@ def assign_charges(mol, charge='gasteiger', confId=0, opt=True, work_dir=None, t
         gc.collect()
 
     else:
-        utils.radon_print('%s is not implemented in RadonPy.' % (charge), level=3)
+        utils.radon_print(f'{charge} is not implemented in RadonPy.', level=3)
         return False
 
     return True
@@ -479,9 +479,9 @@ def charge_neutralize2(mol, tol=1e-12, retry=100):
         RDKit Mol object
     """
 
-    charge = Decimal('%.16e' % 0.0)
+    charge = Decimal(f'{0.0:.16e}')
     for p in mol.GetAtoms():
-        charge += Decimal('%.16e' % (p.GetDoubleProp('AtomicCharge')))
+        charge += Decimal(f"{p.GetDoubleProp('AtomicCharge'):.16e}")
 
     if abs(charge) > tol:
         for i in range(retry):
@@ -489,12 +489,12 @@ def charge_neutralize2(mol, tol=1e-12, retry=100):
             for p in mol.GetAtoms():
                 p.SetDoubleProp(
                     'AtomicCharge',
-                    float(Decimal('%.16e' % p.GetDoubleProp('AtomicCharge'))-Decimal('%.16e' % float(corr)))
+                    float(Decimal(f"{p.GetDoubleProp('AtomicCharge'):.16e}") - Decimal(f'{float(corr):.16e}'))
                 )
 
-            charge_new = Decimal('%.16e' % 0.0)
+            charge_new = Decimal(f'{0.0:.16e}')
             for p in mol.GetAtoms():
-                charge_new += Decimal('%.16e' % (p.GetDoubleProp('AtomicCharge')))
+                charge_new += Decimal(f"{p.GetDoubleProp('AtomicCharge'):.16e}")
 
             if abs(charge_new) < tol:
                 break
@@ -688,7 +688,7 @@ def vdw_volume(mol, confId=0, method='grid', radii='rdkit', gridSpacing=0.2):
         return np.sum(V_vdw)
     
     else:
-        utils.radon_print('Illegal input of method = %s' % method, level=3)
+        utils.radon_print(f'Illegal input of method = {method}', level=3)
         return np.nan
 
 
@@ -820,7 +820,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
     elif etkdg_ver == 1:
         etkdg = AllChem.ETKDG()
     else:
-        utils.radon_print('Illegal input of etkdg_ver = %s' % clustering, level=3)
+        utils.radon_print(f'Illegal input of etkdg_ver = {clustering}', level=3)
         return mol_c, np.array([])
 
     if etkdg_omp < 0:
@@ -838,7 +838,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
     etkdg.numThreads = etkdg_omp
     AllChem.EmbedMultipleConfs(mol_c, nconf, etkdg)
     nconf = mol_c.GetNumConformers()
-    utils.radon_print('%i conformers were generated.' % nconf)
+    utils.radon_print(f'{nconf} conformers were generated.')
 
     energies = []
     dft_energies = []
@@ -846,7 +846,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
     e_dft_res = []
 
     # Optimization conformers by MM
-    utils.radon_print('Start optimization of %i conformers by MM level.' % nconf, level=1)
+    utils.radon_print(f'Start optimization of {nconf} conformers by MM level.', level=1)
     if ff and MD_avail:
         # Using LAMMPS
         ff.ff_assign(mol_c, charge='gasteiger')
@@ -959,12 +959,12 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
                 utils.radon_print('Skip the clustering.')
                 skip_flag = True
         else:
-            utils.radon_print('Illegal input of clustering = %s' % clustering, level=3)
+            utils.radon_print(f'Illegal input of clustering = {clustering}', level=3)
             Chem.SanitizeMol(mol_c)
             return mol_c, e_res
 
         if not skip_flag:
-            utils.radon_print('Clusters:%s' % str(clusters))
+            utils.radon_print(f'Clusters:{str(clusters)}')
             idx_list = []
             for cl in clusters:
                 cl = list(cl)
@@ -979,14 +979,14 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
             idx_list.sort()
 
             e_res_new = np.zeros_like(idx_list, dtype=float)
-            utils.radon_print('%i conformers were reduced to %i conformers by clustering.' % (nconf, len(idx_list)))
+            utils.radon_print(f'{nconf} conformers were reduced to {len(idx_list)} conformers by clustering.')
         
             for cid in idx_list:
                 mol_c.GetConformer(cid).SetId(cid+nconf)
             for i, cid in enumerate(idx_list):
                 mol_c.GetConformer(cid+nconf).SetId(i)
                 e_res_new[i] = e_res[cid]
-                utils.radon_print('Changing conformer ID %i -> %i' % (cid, i))
+                utils.radon_print(f'Changing conformer ID {cid} -> {i}')
         else:
             e_res_new = e_res[:]
     else:
@@ -1013,7 +1013,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
         psi4mol = QMw(mol_c, work_dir=work_dir, tmp_dir=tmp_dir, omp=psi4_omp, qm_solver=qm_solver, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
                         memory=memory, **kwargs)
 
-        utils.radon_print('Start optimization of %i conformers by DFT level.' % dft_nconf, level=1)
+        utils.radon_print(f'Start optimization of {dft_nconf} conformers by DFT level.', level=1)
 
         # Parallel execution of psi4 optimizations
         if (psi4_mp > 0 or const.mpi4py_avail) and dft_nconf > 1:
@@ -1066,9 +1066,9 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
         # Sequential execution of psi4 optimizations
         else:
             for i in tqdm(range(dft_nconf), desc='[DFT optimization]', disable=const.tqdm_disable):
-                utils.radon_print('DFT optimization of conformer %i' % i)
+                utils.radon_print(f'DFT optimization of conformer {i}')
                 psi4mol.confId = i
-                psi4mol.name = '%s_conf_search_%i' % (log_name, i)
+                psi4mol.name = f'{log_name}_conf_search_{i}'
                 energy, _ = psi4mol.optimize(ignore_conv_error=True, geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm)
                 if not psi4mol.error_flag:
                     opt_success += 1
@@ -1093,7 +1093,7 @@ def conformation_search(mol, ff=None, nconf=1000, dft_nconf=0, etkdg_ver=2, rmst
             psi4mol.mol.GetConformer(int(cid[1]+nconf_new)).SetId(i)
             re_energy[i, 0] = e_dft_res[int(cid[1])]
             re_energy[i, 1] = e_res_new[int(cid[1])]
-            utils.radon_print('Changing conformer ID %i -> %i' % (int(cid[1]), i))
+            utils.radon_print(f'Changing conformer ID {int(cid[1])} -> {i}')
         if nconf_new > dft_nconf:
             re_energy[dft_nconf:, 1] = e_res_new[dft_nconf:]
 
@@ -1112,7 +1112,7 @@ def _conf_search_lammps_worker(args):
     mol, confId, solver, solver_path, work_dir, omp, mpi, gpu, c = args
     utils.restore_const(c)
 
-    utils.radon_print('Worker process %i start on %s. PID: %i' % (confId, socket.gethostname(), os.getpid()))
+    utils.radon_print(f'Worker process {confId} start on {socket.gethostname()}. PID: {os.getpid()}')
 
     utils.restore_picklable(mol)
     mol, energy, coord = md.quick_min(mol, confId=confId, min_style='cg', idx=confId, tmp_clear=True,
@@ -1127,7 +1127,7 @@ def _conf_search_rdkit_worker(args):
     mol, prop, confId, c = args
     utils.restore_const(c)
 
-    utils.radon_print('Worker process %i start on %s. PID: %i' % (confId, socket.gethostname(), os.getpid()))
+    utils.radon_print(f'Worker process {confId} start on {socket.gethostname()}. PID: {os.getpid()}')
     
     utils.restore_picklable(mol)
     mmff = AllChem.MMFFGetMoleculeForceField(mol, prop, confId=confId)
@@ -1144,15 +1144,15 @@ def _conf_search_psi4_worker(args):
     mol, confId, work_dir, tmp_dir, psi4_omp, qm_solver, opt_method, opt_basis, opt_basis_gen, log_name, geom_iter, geom_conv, geom_algorithm, memory, kwargs, c = args
     utils.restore_const(c)
 
-    utils.radon_print('Worker process %i start on %s. PID: %i' % (confId, socket.gethostname(), os.getpid()))
+    utils.radon_print(f'Worker process {confId} start on {socket.gethostname()}. PID: {os.getpid()}')
 
     error_flag = False
     utils.restore_picklable(mol)
     psi4mol = QMw(mol, work_dir=work_dir, tmp_dir=tmp_dir, omp=psi4_omp, qm_solver=qm_solver, method=opt_method, basis=opt_basis, basis_gen=opt_basis_gen,
                     memory=memory, **kwargs)
     psi4mol.confId = confId
-    psi4mol.name = '%s_conf_search_%i' % (log_name, confId)
-    utils.radon_print('DFT optimization of conformer %i' % psi4mol.confId)
+    psi4mol.name = f'{log_name}_conf_search_{confId}'
+    utils.radon_print('DFT optimization of conformer {psi4mol.confId}')
 
     energy, coord = psi4mol.optimize(ignore_conv_error=True, geom_iter=geom_iter, geom_conv=geom_conv, geom_algorithm=geom_algorithm)
     error_flag = psi4mol.error_flag
