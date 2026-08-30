@@ -409,7 +409,7 @@ class EQ21step(Equilibration):
 
         eq_last_pickle = os.path.join(self.save_dir, self.pickle_file)
         if os.path.exists(eq_last_pickle):
-            utils.radon_print("sampling simulation (eq3) has already completed")
+            utils.radon_print("sampling simulation (eq3) has already completed", level=1)
             self.mol = utils.pickle_load(eq_last_pickle)
         else:
             dt1 = datetime.datetime.now()

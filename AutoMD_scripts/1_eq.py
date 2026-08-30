@@ -216,6 +216,7 @@ if __name__ == '__main__':
     # Equilibration MD
     eqmd = eq.EQ21step(ac, work_dir=work_dir, no_traj_ann=no_traj)
     ac = eqmd.exec(temp=data['temp'], press=data['press'], mpi=mpi, omp=omp, gpu=gpu, intel=intel, opt=opt)
+    utils.radon_print('Analyzing MD data.', level=1)
     analy = eqmd.analyze()
     prop_data = analy.get_all_prop(temp=data['temp'], press=data['press'], save=True)
     result = analy.check_eq()

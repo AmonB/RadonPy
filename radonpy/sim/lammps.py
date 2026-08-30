@@ -12,12 +12,15 @@ import math
 import numpy as np
 from scipy import stats
 import pandas as pd
-from matplotlib import pyplot as pp
+from matplotlib import pyplot as plt
 from rdkit import Chem
 from rdkit import Geometry as Geom
 from ..core import calc, poly, const, utils
 from ..ff import ff_class
 
+### Plot global settings
+plt.rcParams['font.family'] = 'Arial'
+# plt.rcParams['font.family'] = 'Times New Roman'
 
 # CL Modification **************************************
 import collections
@@ -1335,7 +1338,7 @@ class Analyze():
         self.volexp_sma_sd_crit = kwargs.get('volexp_sma_sd_crit', None)
 
 
-    def read_log(self, log_file, ignore_log=[]):
+    def read_log(self, log_file, ignore_log=None):
         """
         lammps.Analyze.read_log
 
@@ -1362,7 +1365,7 @@ class Analyze():
 
 
     @classmethod
-    def parse_thermo(cls, log_data, ignore_log=[]):
+    def parse_thermo(cls, log_data, ignore_log=None):
         """
         lammps.Analyze.parse_thermo
 
@@ -1384,40 +1387,85 @@ class Analyze():
             ignore_log = ['WARNING: Too many warnings:']
 
         for line in log_data:
-            if line.find('Per MPI rank memory allocation') == 0 or line.find('Memory usage per processor') == 0:
-                d_flag = 1
+            line = line.strip()
+            if d_flag == 0:
+                if (line.startswith('Per MPI rank memory allocation') or line.startswith('Memory usage per processor')):
+                    d_flag = 1
+                    columns = []
+                    data = []
+                continue
+
             elif d_flag == 1:
-                columns = line.split()
-                d_flag = 2
-            elif d_flag >= 1 and (line.find('Loop time of') == 0 or line.find('ERROR') == 0 or line == ''):
-                df = pd.DataFrame(data, columns=columns)
-                if 'Step' in columns:
-                    df = df.set_index('Step')
-                dfs.append(df)
-                d_flag = 0
-                columns = []
-                data = []
-            elif d_flag == 2:
-                try:
-                    ignore_flag = False
-                    for ignore_line in ignore_log:
-                        if ignore_line in line:
-                            ignore_flag = True
-                            break
-                    if ignore_flag:
-                        continue
-                    data.append([float(f) for f in line.split()])
-                except ValueError as e:
-                    utils.radon_print('Can not parse thermodynamic data. %s; Skip to parse the data of %i step.' % (e, len(dfs)), level=1)
+                if line.startswith('ERROR') or line.startswith('Loop time of'):
                     d_flag = 0
                     columns = []
                     data = []
+                    continue
 
-        if d_flag >= 1:
-            df = pd.DataFrame(data, columns=columns)
-            if 'Step' in columns:
-                df = df.set_index('Step')
-            dfs.append(df)
+                if line == '':
+                    continue
+
+                # Keep compatibility with the original ignore_log behavior.
+                ignore_flag = False
+                for ignore_line in ignore_log:
+                    if ignore_line in line:
+                        ignore_flag = True
+                        break
+
+                if ignore_flag:
+                    continue
+
+                fields = line.split()
+
+                if 'Step' in fields:
+                    columns = fields
+                    d_flag = 2
+
+                continue
+
+            elif d_flag == 2:
+                if line.startswith('Loop time of'):
+                    if data:
+                        df = pd.DataFrame(data, columns=columns)
+                        if 'Step' in columns:
+                            df = df.set_index('Step')
+                        dfs.append(df)
+
+                    # Reset for the next MD/run
+                    d_flag = 0
+                    columns = []
+                    data = []
+                    continue
+
+                if line.startswith('ERROR') or line == '':
+                    d_flag = 0
+                    columns = []
+                    data = []
+                    continue
+
+                ignore_flag = False
+                for ignore_line in ignore_log:
+                    if ignore_line in line:
+                        ignore_flag = True
+                        break
+
+                if ignore_flag:
+                    continue
+
+                try:
+                    values = [float(f) for f in line.split()]
+
+                except ValueError as e:
+                    utils.radon_print(f'Can not parse thermodynamic data. {e}; '
+                                      f'Skip to parse the data of {len(dfs)} step.',level=1)
+
+                    d_flag = 0
+                    columns = []
+                    data = []
+                    continue
+
+                data.append(values)
+
 
         return dfs
 
@@ -1472,8 +1520,8 @@ class Analyze():
 
         if printout or save:
             if not last: last = None
-            fig, ax = pp.subplots(figsize=(6, 6))
-            ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0))
+            fig, ax = plt.subplots(figsize=(6, 6))
+            ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0), useMathText=True)
             ax.plot(thermo_df['Time'].values[init:last]*ps, data_conv.values[init:last], linewidth=0.1)
             ax.errorbar(thermo_df['Time'].values[init:last]*ps, data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
@@ -1483,7 +1531,7 @@ class Analyze():
             output += 'SMA_SD = %e     SMA_SE = %e\n' % (data['sma_sd'], data['sma_se'])
 
             if printout:
-                pp.show()
+                plt.show()
                 print(output)
 
             if save:
@@ -1493,7 +1541,7 @@ class Analyze():
                 with open(os.path.join(save, target+'.txt'), mode='w') as f:
                     f.write(output)
             
-            pp.close(fig)
+            plt.close(fig)
 
         return data
 
@@ -1577,8 +1625,8 @@ class Analyze():
 
         if printout or save:
             if not last: last = None
-            fig, ax = pp.subplots(figsize=(6, 6))
-            ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0))
+            fig, ax = plt.subplots(figsize=(6, 6))
+            ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0), useMathText=True)
             ax.plot(prop_df['Time'].values[:last]*ps, data_conv.values[:last], linewidth=1.0)
             ax.errorbar(prop_df['Time'].values[:last]*ps, data_sma.values, yerr=data_se.values*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
@@ -1588,7 +1636,7 @@ class Analyze():
             output += 'SMA_SD = %e     SMA_SE = %e\n' % (data['sma_sd'], data['sma_se'])
 
             if printout:
-                pp.show()
+                plt.show()
                 print(output)
 
             if save:
@@ -1598,7 +1646,7 @@ class Analyze():
                 with open(os.path.join(save, name+'.txt'), mode='w') as f:
                     f.write(output)
             
-            pp.close(fig)
+            plt.close(fig)
 
         return data
 
@@ -2196,8 +2244,8 @@ class Analyze():
 
         if printout or save:
             if not last: last = None
-            fig, ax = pp.subplots(figsize=(6, 6))
-            ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0))
+            fig, ax = plt.subplots(figsize=(6, 6))
+            ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0), useMathText=True)
 
             if prop in ['dielectric', 'compressibility', 'expansion']:
                 ax.plot(time, prop_data.values, linewidth=2.0)
@@ -2220,7 +2268,7 @@ class Analyze():
                 output += 'SMA_SD = %e     SMA_SE = %e' % (data['sma_sd'], data['sma_se'])
             
             if printout:
-                pp.show()
+                plt.show()
                 print(output)
 
             if save:
@@ -2231,7 +2279,7 @@ class Analyze():
                 with open(os.path.join(save, label)+'.txt', mode='w') as f:
                     f.write(output)
             
-            pp.close(fig)
+            plt.close(fig)
 
         return prop_data, data
 
