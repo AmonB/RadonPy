@@ -42,8 +42,8 @@ class LAMMPS():
         self.solver_path = solver_path if solver_path else const.lammps_exec
 
         self.idx = kwargs.get('idx', None)
-        self.dat_file = kwargs.get('dat_file', 'radon_md_lmp.data' if self.idx is None else 'radon_md_lmp_%i.data' % self.idx)
-        self.input_file = kwargs.get('input_file', 'radon_lmp.in' if self.idx is None else 'radon_lmp_%i.in' % self.idx)
+        self.dat_file = kwargs.get('dat_file', 'radon_md_lmp.data' if self.idx is None else f'radon_md_lmp_{self.idx}.data')
+        self.input_file = kwargs.get('input_file', 'radon_lmp.in' if self.idx is None else f'radon_lmp_{self.idx}.in')
         self.output_file = kwargs.get('output_file', 'log.lammps')
 
         self.package = {
@@ -137,16 +137,16 @@ class LAMMPS():
             os.environ['OMP_NUM_THREADS'] = str(omp)
 
         if gpu > 0 and omp > 0:
-            acc_str = '-sf gpu -pk gpu %i omp %i' % (gpu, omp)
+            acc_str = f'-sf gpu -pk gpu {gpu} omp {omp}'
         elif gpu > 0:
-            acc_str = '-sf gpu -pk gpu %i' % (gpu)
+            acc_str = f'-sf gpu -pk gpu {gpu}'
         elif omp > 0:
             if intel_flag:
-                acc_str = '-sf hybrid intel omp -pk omp %i' % (omp)
+                acc_str = f'-sf hybrid intel omp -pk omp {omp}'
             elif opt_flag:
-                acc_str = '-sf opt -pk omp %i' % (omp)
+                acc_str = f'-sf opt -pk omp {omp}'
             else:
-                acc_str = '-sf omp -pk omp %i' % (omp)
+                acc_str = f'-sf omp -pk omp {omp}'
         else:
             if intel_flag:
                 acc_str = '-sf intel'
@@ -160,11 +160,11 @@ class LAMMPS():
                 if i == 0:
                     lmp_cmd  = const.lmp_cmd % (self.solver_path, acc_str, infile, output_file)
                 else:
-                    lmp_cmd += str(' : -n %i ' % mpi) + str(const.lmp_cmd % (self.solver_path, acc_str, infile, output_file))
+                    lmp_cmd += str(f' : -n {mpi} ') + str(const.lmp_cmd % (self.solver_path, acc_str, infile, output_file))
         else:
             lmp_cmd = const.lmp_cmd % (self.solver_path, acc_str, input_file, output_file)
 
-        cmd = '%s %s' % (mpi_cmd, lmp_cmd)
+        cmd = f'{mpi_cmd} {lmp_cmd}'
         utils.radon_print(cmd)
         if return_cmd:
             return cmd
@@ -176,7 +176,7 @@ class LAMMPS():
             fh.write(cmd+'\n')
             fh.write(cp.stdout+'\n')
             fh.write(cp.stderr+'\n')
-            fh.write('LAMMPS returncode = %s \n' % (str(cp.returncode)))
+            fh.write(f'LAMMPS returncode = {str(cp.returncode)} \n')
 
         os.chdir(cwd)
 
@@ -204,9 +204,9 @@ class LAMMPS():
                 ):
             if os.path.isfile(os.path.join(self.work_dir, output_file)):
                 with open(os.path.join(self.work_dir, output_file), 'r') as fh:
-                    utils.radon_print('%s' % fh.read())
-            utils.radon_print('Error termination of %s. Input file = %s; Data file = %s; Return code = %i;'
-                % (self.get_name, input_file, md.dat_file, cp.returncode), level=3)
+                    utils.radon_print(f'{fh.read()}')
+            utils.radon_print(f'Error termination of {self.get_name}. Input file = {input_file}; '
+                              f'Data file = {md.dat_file}; Return code = {cp.returncode};', level=3)
             return cp.returncode
 
         if isinstance(mol, Chem.Mol) and last_str is not None:
@@ -234,7 +234,7 @@ class LAMMPS():
         package_list = []
 
         try:
-            cmd = '%s -h' % self.solver_path
+            cmd = f'{self.solver_path} -h'
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
 
@@ -271,7 +271,7 @@ class LAMMPS():
                 mpi_cmd = const.mpi_cmd % 1
                 mpi_cmd = mpi_cmd.split()[0]
 
-                cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+                cmd = f'{mpi_cmd} {self.solver_path} -h'
                 cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
                 lines = str(cp.stdout).splitlines()
 
@@ -321,23 +321,23 @@ class LAMMPS():
 
         ver = None
         try:
-            cmd = '%s -h' % self.solver_path
+            cmd = f'{self.solver_path} -h'
             cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
             lines = str(cp.stdout).splitlines()
 
             for l in lines:
                 if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
-                    ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
+                    ver = f'{str(l.split()[6])}{str(l.split()[7])}{str(l.split()[8])}'
         except:
             try:
                 mpi_cmd = const.mpi_cmd % 1
-                cmd = '%s %s -h' % (mpi_cmd, self.solver_path)
+                cmd = f'{mpi_cmd} {self.solver_path} -h'
                 cp = subprocess.run([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
                 lines = str(cp.stdout).splitlines()
 
                 for l in lines:
                     if 'Large-scale Atomic/Molecular Massively Parallel Simulator' in l:
-                        ver = '%s%s%s' % (str(l.split()[6]), str(l.split()[7]), str(l.split()[8]))
+                        ver = f'{str(l.split()[6])}{str(l.split()[7])}{str(l.split()[8])}'
             except:
                 return ver
 
@@ -398,32 +398,32 @@ class LAMMPS():
 
         indata = []
         if md.log_append:
-            indata.append('log %s append' % (md.log_file))
+            indata.append(f'log {md.log_file} append')
         else:
-            indata.append('log %s' % (md.log_file))
-        indata.append('units %s' % (md.units))
-        indata.append('atom_style %s' % (md.atom_style))
+            indata.append(f'log {md.log_file}')
+        indata.append(f'units {md.units}')
+        indata.append(f'atom_style {md.atom_style}')
         if md.pbc:
-            indata.append('boundary %s' % (md.boundary))
+            indata.append(f'boundary {md.boundary}')
         else:
             indata.append('boundary f f f')
 
         indata.append('')
         if md.pbc:
-            indata.append('pair_style %s %s %s' % (md.pair_style, str(md.cutoff_in), str(md.cutoff_out)))
-            indata.append('kspace_style %s %s' % (md.kspace_style, md.kspace_style_accuracy))
+            indata.append(f'pair_style {md.pair_style} {str(md.cutoff_in)} {str(md.cutoff_out)}')
+            indata.append(f'kspace_style {md.kspace_style} {md.kspace_style_accuracy}')
         else:
-            indata.append('pair_style %s %s %s' % (md.pair_style_nonpbc, str(md.cutoff_in), str(md.cutoff_out)))
+            indata.append(f'pair_style {md.pair_style_nonpbc} {str(md.cutoff_in)} {str(md.cutoff_out)}')
 
-        indata.append('dielectric %f' % (md.dielectric))
-        indata.append('bond_style %s' % (md.bond_style))
-        indata.append('angle_style %s' % (md.angle_style))
-        indata.append('dihedral_style %s' % (md.dihedral_style))
-        indata.append('improper_style %s' % (md.improper_style))
-        indata.append('special_bonds %s' % (md.special_bonds))
-        indata.append('pair_modify %s' % (md.pair_modify))
-        indata.append('neighbor %s' % (md.neighbor))
-        indata.append('neigh_modify %s' % (md.neigh_modify))
+        indata.append(f'dielectric {md.dielectric}')
+        indata.append(f'bond_style {md.bond_style}')
+        indata.append(f'angle_style {md.angle_style}')
+        indata.append(f'dihedral_style {md.dihedral_style}')
+        indata.append(f'improper_style {md.improper_style}')
+        indata.append(f'special_bonds {md.special_bonds}')
+        indata.append(f'pair_modify {md.pair_modify}')
+        indata.append(f'neighbor {md.neighbor}')
+        indata.append(f'neigh_modify {md.neigh_modify}')
 
         cmap_read_data = ''
         if md.mol is not None and hasattr(md.mol, 'cmaps'):
@@ -440,10 +440,11 @@ class LAMMPS():
             c = collections.Counter(tmp_list)
             max_react = max(c.values())
 
-            indata.append('read_data %s extra/special/per/atom %i extra/bond/per/atom %i extra/angle/per/atom %i%s' % (md.dat_file, 25*max_react, max_react, 10*max_react, cmap_read_data))
+            indata.append(f'read_data {md.dat_file} extra/special/per/atom {25*max_react} '
+                          f'extra/bond/per/atom {max_react} extra/angle/per/atom {10*max_react}{cmap_read_data}')
         
         else:
-            indata.append('read_data %s%s' % (md.dat_file, cmap_read_data))
+            indata.append(f'read_data {md.dat_file}{cmap_read_data}')
 # ******************************************************************
 
         indata.append('')
@@ -459,9 +460,9 @@ class LAMMPS():
             all_nowater = 'nowater0'
 
         indata.append('')
-        indata.append('thermo_style custom %s' % ' '.join(md.thermo_style))
+        indata.append(f"thermo_style custom {' '.join(md.thermo_style)}")
         indata.append('thermo_modify flush yes')
-        indata.append('thermo %i' % (md.thermo_freq))
+        indata.append(f'thermo {md.thermo_freq}')
 
         if len(md.add) > 0:
             indata.append('')
@@ -469,19 +470,19 @@ class LAMMPS():
 
         if md.dump_file:
             indata.append('')
-            indata.append('dump dump0 all custom %i %s %s' % (md.dump_freq, md.dump_file, md.dump_style))
+            indata.append(f'dump dump0 all custom {md.dump_freq} {md.dump_file} {md.dump_style}')
 
         if md.xtc_file:
-            indata.append('dump xtc0 all xtc %i %s' % (md.dump_freq, md.xtc_file))
+            indata.append(f'dump xtc0 all xtc {md.dump_freq} {md.xtc_file}')
             indata.append('dump_modify xtc0 unwrap yes')
 
         if md.rst:
-            indata.append('restart %i %s %s' % (md.rst_freq, md.rst1_file, md.rst2_file))
+            indata.append(f'restart {md.rst_freq} {md.rst1_file} {md.rst2_file}')
 
         # Generate initial velocity
         if type(md.set_init_velocity) is float or type(md.set_init_velocity) is int:
             indata.append('')
-            indata.append('velocity all create %f %i mom yes rot yes dist gaussian' % (md.set_init_velocity, np.random.randint(1000, 999999)))
+            indata.append(f'velocity all create {md.set_init_velocity} {np.random.randint(1000, 999999)} mom yes rot yes dist gaussian')
 
         # Generate "fix drude"
         if md.drude:
@@ -499,34 +500,34 @@ class LAMMPS():
                 if len(tip_types) > 0:
                     indata.append('fix freeze water0 setforce 0.0 0.0 0.0')
                     
-                indata.append('min_style %s' % (wf.min_style))
-                indata.append('minimize %f %f %i %i' % (wf.etol, wf.ftol, wf.maxiter, wf.maxeval))
+                indata.append(f'min_style {wf.min_style}')
+                indata.append(f'minimize {wf.etol} {wf.ftol} {wf.maxiter} {wf.maxeval}')
                 indata.append('reset_timestep 0')
 
                 if len(tip_types) > 0:
                     indata.append('unfix freeze')
                 
                 if md.dump_file:
-                    indata.append('dump dump0 all custom %i %s %s' % (md.dump_freq, md.dump_file, md.dump_style))
+                    indata.append(f'dump dump0 all custom {md.dump_freq} {md.dump_file} {md.dump_style}')
                 if md.xtc_file:
-                    indata.append('dump xtc0 all xtc %i %s' % (md.dump_freq, md.xtc_file))
+                    indata.append(f'dump xtc0 all xtc {md.dump_freq} {md.xtc_file}')
                     indata.append('dump_modify xtc0 unwrap yes')
                 
             elif wf.type == 'md':
                 unfix = []
                 seed = np.random.randint(1000, 999999)
                 indata.append('')
-                indata.append('timestep %f' % (wf.time_step))
+                indata.append(f'timestep {wf.time_step}')
 
                 # Generate initial velocity
                 if type(wf.set_init_velocity) is float or type(wf.set_init_velocity) is int:
                     indata.append('')
-                    indata.append('velocity all create %f %i mom yes rot yes dist gaussian' % (wf.set_init_velocity, np.random.randint(1000, 999999)))
+                    indata.append(f'velocity all create {wf.set_init_velocity:f} {np.random.randint(1000, 999999)} mom yes rot yes dist gaussian')
 
                 # Generate compute chunk/atom molecule
                 if wf.chunk_mol:
-                    indata.append('compute cmol%i all chunk/atom molecule nchunk once limit 0 ids once compress no' % (i+1))
-                    unfix.append('uncompute cmol%i' % (i+1))
+                    indata.append(f'compute cmol{i+1} all chunk/atom molecule nchunk once limit 0 ids once compress no')
+                    unfix.append(f'uncompute cmol{i+1}')
 
 # CL modification **************************************************
                 # Generate "fix bond/create"
@@ -578,8 +579,8 @@ class LAMMPS():
 
                 # Generate SHAKE constraint
                 if wf.shake:
-                    indata.append('fix shake%i %s shake 1e-4 1000 0 m 1.0' % (i+1, all_nowater))
-                    unfix.append('unfix shake%i' % (i+1))
+                    indata.append(f'fix shake{i+1} {all_nowater} shake 1e-4 1000 0 m 1.0')
+                    unfix.append(f'unfix shake{i+1}')
 
                 # Generate "fix deform"
                 if wf.deform:
@@ -591,20 +592,20 @@ class LAMMPS():
                 if wf.ensemble in ['npt', 'nph']:
                     if wf.p_aniso:
                         if wf.px_start is None and wf.py_start is None and wf.pz_start is None:
-                            p_str = 'aniso %f %f %f ' % (wf.p_start, wf.p_stop, wf.p_dump)
+                            p_str = f'aniso {wf.p_start:f} {wf.p_stop:f} {wf.p_dump:f} '
                         else:
                             p_str = ''
                             if wf.px_start is not None and wf.px_stop is not None and wf.px_dump is not None:
-                                p_str += 'x %f %f %f ' % (wf.px_start, wf.px_stop, wf.px_dump)
+                                p_str += f'x {wf.px_start:f} {wf.px_stop:f} {wf.px_dump:f} '
                             if wf.py_start is not None and wf.py_stop is not None and wf.py_dump is not None:
-                                p_str += 'y %f %f %f ' % (wf.py_start, wf.py_stop, wf.py_dump)
+                                p_str += f'y {wf.py_start:f} {wf.py_stop:f} {wf.py_dump:f} '
                             if wf.pz_start is not None and wf.pz_stop is not None and wf.pz_dump is not None:
-                                p_str += 'z %f %f %f ' % (wf.pz_start, wf.pz_stop, wf.pz_dump)
+                                p_str += f'z {wf.pz_start:f} {wf.pz_stop:f} {wf.pz_dump:f} '
                         if wf.p_couple:
-                            p_str += 'couple %s ' % (wf.p_couple)
+                            p_str += f'couple {wf.p_couple} '
                     else:
-                        p_str = 'iso %f %f %f ' % (wf.p_start, wf.p_stop, wf.p_dump)
-                    p_str += 'nreset %i ' % wf.p_nreset
+                        p_str = f'iso {wf.p_start:f} {wf.p_stop:f} {wf.p_dump:f} '
+                    p_str += f'nreset {wf.p_nreset} '
 
 
                 # Generate time integration, thermostat, and barostat
@@ -612,128 +613,127 @@ class LAMMPS():
                     indata.append('')
                     indata.append('# nve')
                     if wf.nve_limit == 0:
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
                     else:
-                        indata.append('fix md%i %s nve/limit %f' % (i+1, all_nowater, wf.nve_limit))
+                        indata.append(f'fix md{i+1} {all_nowater} nve/limit {wf.nve_limit}')
 
                 elif wf.ensemble == 'nvt':
                     indata.append('')
                     indata.append('# nvt')
                     if wf.thermostat == 'Nose-Hoover':
-                        indata.append('fix md%i %s nvt temp %f %f %f' % (i+1, all_nowater, wf.t_start, wf.t_stop, wf.t_dump))
+                        indata.append(f'fix md{i+1} {all_nowater} nvt temp {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
 
                     elif wf.thermostat == 'Langevin':
-                        indata.append('fix thermostat%i all langevin %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all langevin {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'Berendsen':
-                        indata.append('fix thermostat%i all temp/berendsen %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/berendsen {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'csvr':
-                        indata.append('fix thermostat%i all temp/csvr %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i all nve' % (i+1))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/csvr {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix md{i+1} all nve')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'csld':
-                        indata.append('fix thermostat%i all temp/csld %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/csld {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     else:
-                        utils.radon_print('%s thermostat does not support in RadonPy' % (wf.thermostat), level=3)
+                        utils.radon_print(f'{wf.thermostat} thermostat does not support in RadonPy', level=3)
                         return None
 
                 elif wf.ensemble == 'npt':
                     indata.append('')
                     indata.append('# npt')
                     if wf.thermostat == 'Nose-Hoover' and wf.barostat == 'Nose-Hoover':
-                        indata.append('fix md%i %s npt temp %f %f %f %s' %
-                                    (i+1, all_nowater, wf.t_start, wf.t_stop, wf.t_dump, p_str))
+                        indata.append(f'fix md{i+1} {all_nowater} npt temp {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {p_str}')
 
                     elif wf.thermostat == 'Langevin' and wf.barostat == 'Nose-Hoover':
-                        indata.append('fix thermostat%i all langevin %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all langevin {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix md{i+1} {all_nowater} nph {p_str}')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'Berendsen' and wf.barostat == 'Nose-Hoover':
-                        indata.append('fix thermostat%i all temp/berendsen %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
-                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/berendsen {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
+                        indata.append(f'fix md{i+1} {all_nowater} nph {p_str}')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'csvr' and wf.barostat == 'Nose-Hoover':
-                        indata.append('fix thermostat%i all temp/csvr %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/csvr {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix md{i+1} {all_nowater} nph {p_str}')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'csld' and wf.barostat == 'Nose-Hoover':
-                        indata.append('fix thermostat%i all temp/csld %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
-                        unfix.append('unfix thermostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/csld {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix md{i+1} {all_nowater} nph {p_str}')
+                        unfix.append(f'unfix thermostat{i+1}')
 
                     elif wf.thermostat == 'Nose-Hoover' and wf.barostat == 'Berendsen':
-                        indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i %s nvt temp %f %f %f' % (i+1, all_nowater, wf.t_start, wf.t_stop, wf.t_dump))
-                        unfix.append('unfix barostat%i' % (i+1))
+                        indata.append(f'fix barostat{i+1} all press/berendsen {p_str}')
+                        indata.append(f'fix md{i+1} {all_nowater} nvt temp {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
+                        unfix.append(f'unfix barostat{i+1}')
 
                     elif wf.thermostat == 'Langevin' and wf.barostat == 'Berendsen':
-                        indata.append('fix thermostat%i all langevin %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
-                        unfix.append('unfix barostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all langevin {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix barostat{i+1} all press/berendsen {p_str}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
+                        unfix.append(f'unfix barostat{i+1}')
 
                     elif wf.thermostat == 'Berendsen' and wf.barostat == 'Berendsen':
-                        indata.append('fix thermostat%i all temp/berendsen %f %f %f' % (i+1, wf.t_start, wf.t_stop, wf.t_dump))
-                        indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
-                        unfix.append('unfix barostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/berendsen {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
+                        indata.append(f'fix barostat{i+1} all press/berendsen {p_str}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
+                        unfix.append(f'unfix barostat{i+1}')
 
                     elif wf.thermostat == 'csvr' and wf.barostat == 'Berendsen':
-                        indata.append('fix thermostat%i all temp/csvr %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
-                        unfix.append('unfix barostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/csvr {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix barostat{i+1} all press/berendsen {p_str}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
+                        unfix.append(f'unfix barostat{i+1}')
 
                     elif wf.thermostat == 'csld' and wf.barostat == 'Berendsen':
-                        indata.append('fix thermostat%i all temp/csld %f %f %f %i' % (i+1, wf.t_start, wf.t_stop, wf.t_dump, seed))
-                        indata.append('fix barostat%i all press/berendsen %s' % (i+1, p_str))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix thermostat%i' % (i+1))
-                        unfix.append('unfix barostat%i' % (i+1))
+                        indata.append(f'fix thermostat{i+1} all temp/csld {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
+                        indata.append(f'fix barostat{i+1} all press/berendsen {p_str}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix thermostat{i+1}')
+                        unfix.append(f'unfix barostat{i+1}')
 
                     else:
-                        utils.radon_print('%s thermostat and/or %s barostat does not support in RadonPy' % (wf.thermostat, wf.barostat), level=3)
+                        utils.radon_print(f'{wf.thermostat} thermostat and/or {wf.barostat} barostat does not support in RadonPy', level=3)
                         return None
 
                 elif wf.ensemble == 'nph':
                     indata.append('')
                     indata.append('# nph')
                     if wf.barostat == 'Nose-Hoover':
-                        indata.append('fix md%i %s nph %s' % (i+1, all_nowater, p_str))
+                        indata.append(f'fix md{i+1} {all_nowater} nph {p_str}')
 
                     elif wf.barostat == 'Berendsen':
-                        indata.append('fix barostat%i %s press/berendsen %s' % (i+1, all_nowater, p_str))
-                        indata.append('fix md%i %s nve' % (i+1, all_nowater))
-                        unfix.append('unfix barostat%i' % (i+1))
+                        indata.append(f'fix barostat{i+1} {all_nowater} press/berendsen {p_str}')
+                        indata.append(f'fix md{i+1} {all_nowater} nve')
+                        unfix.append(f'unfix barostat{i+1}')
 
                     else:
-                        utils.radon_print('%s barostat does not support in RadonPy' % (wf.barostat), level=3)
+                        utils.radon_print(f'{wf.barostat} barostat does not support in RadonPy', level=3)
                         return None
 
                 # Generate RATTLE constraints
                 if wf.rattle:
-                    indata.append('fix rattle%i all rattle 1e-4 1000 0 m 1.0' % (i+1))
-                    unfix.append('unfix rattle%i' % (i+1))
+                    indata.append(f'fix rattle{i+1} all rattle 1e-4 1000 0 m 1.0')
+                    unfix.append(f'unfix rattle{i+1}')
 
                 if wf.momentum:
-                    indata.append('fix momentum%i all momentum 1000 linear 1 1 1 rescale' % (i+1))
-                    unfix.append('unfix momentum%i' % (i+1))
+                    indata.append(f'fix momentum{i+1} all momentum 1000 linear 1 1 1 rescale')
+                    unfix.append(f'unfix momentum{i+1}')
 
                 # Update thermo_style
                 indata.append('')
@@ -742,29 +742,29 @@ class LAMMPS():
 
                 indata.append('')
                 if wf.rerun:
-                    indata.append('rerun %s %s' % (wf.rerun_dump, wf.rerun_keyword))
+                    indata.append(f'rerun {wf.rerun_dump} {wf.rerun_keyword}')
                 else:
-                    indata.append('run %i' % (wf.step))
-                indata.append('unfix md%i' % (i+1))
+                    indata.append(f'run {wf.step}')
+                indata.append(f'unfix md{i+1}')
                 indata.extend(unfix)
                 if len(wf.add_f) > 0:
                     indata.extend(wf.add_f)
 
         if len(md.wf) == 0:
-            indata.append('fix md0 %s nve' % all_nowater)
+            indata.append(f'fix md0 {all_nowater} nve')
             indata.append('run 0')
 
         if md.outstr:
             indata.append('')
-            indata.append('write_dump all custom %s id x y z xu yu zu vx vy vz fx fy fz modify sort id' % (md.outstr))
+            indata.append(f'write_dump all custom {md.outstr} id x y z xu yu zu vx vy vz fx fy fz modify sort id')
             
         if md.write_data:
 # CL modification **************************************************
             indata.append('')
-            indata.append('thermo_style custom %s' % ' '.join(md.thermo_style))
+            indata.append(f"thermo_style custom {' '.join(md.thermo_style)}")
             indata.append('thermo_modify flush yes')
 # ******************************************************************
-            indata.append('write_data %s' % (md.write_data))
+            indata.append(f'write_data {md.write_data}')
 
         if len(md.add_f) > 0:
             indata.append('')
@@ -787,12 +787,12 @@ class LAMMPS():
 
 
     def update_thermo_style(self, md, wf, i, indata, unfix):
-        indata.append('thermo_style custom %s' % ' '.join([*md.thermo_style, *wf.thermo_style]))
+        indata.append(f"thermo_style custom {' '.join([*md.thermo_style, *wf.thermo_style])}")
         indata.append('thermo_modify flush yes')
         if wf.thermo_freq is not None:
-            indata.append('thermo %i' % (wf.thermo_freq))
+            indata.append(f'thermo {wf.thermo_freq}')
         else:
-            indata.append('thermo %i' % (md.thermo_freq))
+            indata.append(f'thermo {md.thermo_freq}')
 
 
     def make_input_drude(self, md, indata):
@@ -805,13 +805,13 @@ class LAMMPS():
         if wf.deform == 'scale':
             if wf.ensemble in ['nvt', 'nve']:
                 if wf.deform_axis == 'x':
-                    indata.append('fix DEF%i all deform 1 x scale %f y volume z volume' % (i+1, wf.deform_scale))
+                    indata.append(f'fix DEF{i+1} all deform 1 x scale {wf.deform_scale:f} y volume z volume')
                 elif wf.deform_axis == 'y':
-                    indata.append('fix DEF%i all deform 1 y scale %f x volume z volume' % (i+1, wf.deform_scale))
+                    indata.append(f'fix DEF{i+1} all deform 1 y scale {wf.deform_scale:f} x volume z volume')
                 elif wf.deform_axis == 'z':
-                    indata.append('fix DEF%i all deform 1 z scale %f x volume y volume' % (i+1, wf.deform_scale))
+                    indata.append(f'fix DEF{i+1} all deform 1 z scale {wf.deform_scale:f} x volume y volume')
             elif wf.ensemble in ['npt', 'nph']:
-                indata.append('fix DEF%i all deform 1 %s scale %f' % (i+1, wf.deform_axis, wf.deform_scale))
+                indata.append(f'fix DEF{i+1} all deform 1 {wf.deform_axis} scale {wf.deform_scale:f}')
                 if not wf.p_aniso:
                     wf.p_aniso = True
                     if wf.deform_axis == 'x':
@@ -835,40 +835,33 @@ class LAMMPS():
                         wf.py_start, wf.py_stop, wf.py_dump = wf.p_start, wf.p_stop, wf.p_dump
                     elif wf.deform_axis == 'yz':
                         wf.px_start, wf.px_stop, wf.px_dump = wf.p_start, wf.p_stop, wf.p_dump
-            unfix.append('unfix DEF%i' % (i+1))
+            unfix.append(f'unfix DEF{i+1}')
 
         elif wf.deform == 'final':
             if wf.ensemble in ['nvt', 'nve']:
                 if wf.deform_axis == 'x':
-                    indata.append('fix DEF%i all deform 1 x final %f %f y volume z volume' % (i+1, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} y volume z volume')
                 elif wf.deform_axis == 'y':
-                    indata.append('fix DEF%i all deform 1 y final %f %f x volume z volume' % (i+1, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 y final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} x volume z volume')
                 elif wf.deform_axis == 'z':
-                    indata.append('fix DEF%i all deform 1 z final %f %f x volume y volume' % (i+1, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 z final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} x volume y volume')
                 elif wf.deform_axis == 'xy':
-                    indata.append('fix DEF%i all deform 1 x final %f %f y final %f %f z volume'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} y final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} z volume')
                 elif wf.deform_axis == 'xz':
-                    indata.append('fix DEF%i all deform 1 x final %f %f y volume z final %f %f'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} y volume z final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
                 elif wf.deform_axis == 'yz':
-                    indata.append('fix DEF%i all deform 1 x volume y final %f %f z final %f %f'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x volume y final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} z final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
                 elif wf.deform_axis == 'xyz':
-                    indata.append('fix DEF%i all deform 1 x final %f %f y final %f %f z final %f %f'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} y final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} z final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
             elif wf.ensemble in ['npt', 'nph']:
                 if wf.deform_axis in ['x', 'y', 'z']:
-                    indata.append('fix DEF%i all deform 1 %s final %f %f' % (i+1, wf.deform_axis, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 {wf.deform_axis} final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
                 elif wf.deform_axis == 'xy':
-                    indata.append('fix DEF%i all deform 1 x final %f %f y final %f %f'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} y final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
                 elif wf.deform_axis == 'xz':
-                    indata.append('fix DEF%i all deform 1 x final %f %f z final %f %f'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 x final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} z final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
                 elif wf.deform_axis == 'yz':
-                    indata.append('fix DEF%i all deform 1 y final %f %f z final %f %f'
-                            % (i+1, wf.deform_fin_lo, wf.deform_fin_hi, wf.deform_fin_lo, wf.deform_fin_hi))
+                    indata.append(f'fix DEF{i+1} all deform 1 y final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f} z final {wf.deform_fin_lo:f} {wf.deform_fin_hi:f}')
                 if not wf.p_aniso:
                     wf.p_aniso = True
                     if wf.deform_axis == 'x':
@@ -894,9 +887,9 @@ class LAMMPS():
                         wf.px_start, wf.px_stop, wf.px_dump = wf.p_start, wf.p_stop, wf.p_dump
             
             if wf.deform_remap:
-                indata[-1] += ' remap %s' % wf.deform_remap
+                indata[-1] += f' remap {wf.deform_remap}'
 
-            unfix.append('unfix DEF%i' % (i+1))
+            unfix.append(f'unfix DEF{i+1}')
 
         return indata, unfix
 
@@ -940,12 +933,12 @@ class LAMMPS():
             ez = wf.efield_z
 
         if wf.efield_freq != 0.0:
-            indata.append('variable efac equal %e*cos(2*PI*%e*time*1e-15)' % (wf.efield_value, wf.efield_freq))
+            indata.append(f'variable efac equal {wf.efield_value:e}*cos(2*PI*{wf.efield_freq:e}*time*1e-15)')
         elif wf.efield_rate != 0.0:
-            indata.append('variable efac equal %e*time' % (wf.efield_rate))
-        indata.append('fix EF%i all efield %s %s %s' % (i+1, ex, ey, ez))
+            indata.append(f'variable efac equal {wf.efield_rate:e}*time')
+        indata.append(f'fix EF{i+1} all efield {ex} {ey} {ez}')
         if not nounfix:
-            unfix.append('unfix EF%i' % (i+1))
+            unfix.append(f'unfix EF{i+1}')
 
         wf.thermo_style += ['v_efac']
 
@@ -953,13 +946,13 @@ class LAMMPS():
 
 
     def make_input_dipole(self, md, wf, i, indata, unfix):
-        indata.append('compute dipole%i all dipole/chunk cmol%i' % (i+1, i+1))
-        indata.append('variable mux equal sum(c_dipole%i[1])' % (i+1))
-        indata.append('variable muy equal sum(c_dipole%i[2])' % (i+1))
-        indata.append('variable muz equal sum(c_dipole%i[3])' % (i+1))
+        indata.append(f'compute dipole{i+1} all dipole/chunk cmol{i+1}')
+        indata.append(f'variable mux equal sum(c_dipole{i+1}[1])')
+        indata.append(f'variable muy equal sum(c_dipole{i+1}[2])')
+        indata.append(f'variable muz equal sum(c_dipole{i+1}[3])')
         indata.append('variable mu equal sqrt(v_mux^2+v_muy^2+v_muz^2)')
 
-        unfix.append('uncompute dipole%i' % (i+1))
+        unfix.append(f'uncompute dipole{i+1}')
 
         wf.thermo_style += ['v_mux', 'v_muy', 'v_muz', 'v_mu']
 
@@ -967,26 +960,26 @@ class LAMMPS():
 
 
     def make_input_rg(self, md, wf, i, indata, unfix):
-        indata.append('compute gyr%i all gyration/chunk cmol%i' % (i+1, i+1))
-        indata.append('fix rg%i all ave/time 1 %i %i c_gyr%i file %s mode vector' % (i+1, wf.rg_ave_length, wf.rg_ave_length, i+1, wf.rg_file))
+        indata.append(f'compute gyr{i+1} all gyration/chunk cmol{i+1}')
+        indata.append(f'fix rg{i+1} all ave/time 1 {wf.rg_ave_length} {wf.rg_ave_length} c_gyr{i+1} file {wf.rg_file} mode vector')
 
-        unfix.append('unfix rg%i' % (i+1))
-        unfix.append('uncompute gyr%i' % (i+1))
+        unfix.append(f'unfix rg{i+1}')
+        unfix.append(f'uncompute gyr{i+1}')
 
         return indata, unfix
 
 
     def make_input_msd(self, md, wf, i, indata, unfix):
-        indata.append('compute msd%i all msd com yes average no' % (i+1))
-        indata.append('fix msd%i all ave/time 1 %i %i c_msd%i[4] mode scalar' % (i+1, md.thermo_freq, md.thermo_freq, i+1))
-        indata.append('variable msd equal f_msd%i' % (i+1))
+        indata.append(f'compute msd{i+1} all msd com yes average no')
+        indata.append(f'fix msd{i+1} all ave/time 1 {md.thermo_freq} {md.thermo_freq} c_msd{i+1}[4] mode scalar')
+        indata.append(f'variable msd equal f_msd{i+1}')
 
-        #indata.append('fix msd%i all vector %i c_msd%i[4]' % (i+1, wf.msd_freq, i+1))
-        #indata.append('variable msd equal ave(f_msd%i)' % (i+1))
-        #indata.append('variable diffc equal slope(f_msd%i)/6/(%i*dt)' % (i+1, wf.msd_freq))
+        #indata.append(f'fix msd{i+1} all vector {wf.msd_freq} c_msd{i+1}[4]')
+        #indata.append(f'variable msd equal ave(f_msd{i+1})')
+        #indata.append(f'variable diffc equal slope(f_msd{i+1})/6/({wf.msd_freq}*dt)')
 
-        unfix.append('unfix msd%i' % (i+1))
-        unfix.append('uncompute msd%i' % (i+1))
+        unfix.append(f'unfix msd{i+1}')
+        unfix.append(f'uncompute msd{i+1}')
 
         wf.thermo_style += ['v_msd']
 
@@ -995,22 +988,22 @@ class LAMMPS():
 
     def make_input_variable(self, md, wf, i, indata, unfix):
         for n, s, a in zip(wf.variable_name, wf.variable_style, wf.variable_args):
-            indata.append('variable %s %s %s' % (n, s, ' '.join(a)))
+            indata.append(f"variable {n} {s} {' '.join(a)}")
 
         return indata, unfix
 
 
     def make_input_timeave(self, md, wf, i, indata, unfix, nounfix=False):
         if wf.timeave_name is None:
-            wf.timeave_name = 'ave%i' % (i+1)
+            wf.timeave_name = f'ave{i+1}'
 
         if not nounfix and not wf.timeave_nounfix:
-            unfix.append('unfix %s' % wf.timeave_name)
+            unfix.append(f'unfix {wf.timeave_name}')
 
         var_str = ' '.join(wf.timeave_var)
-        indata.append('fix %s all ave/time %i %i %i %s' % (wf.timeave_name, wf.timeave_nevery, wf.timeave_nfreq, wf.timeave_nstep, var_str))
+        indata.append(f'fix {wf.timeave_name} all ave/time {wf.timeave_nevery} {wf.timeave_nfreq} {wf.timeave_nstep} {var_str}')
 
-        wf.thermo_style += ['f_%s[%i]' % (wf.timeave_name, (j+1)) for j in range(len(wf.timeave_var))]
+        wf.thermo_style += [f'f_{wf.timeave_name}[{(j+1)}]' for j in range(len(wf.timeave_var))]
 
         return indata, unfix
 
@@ -1028,28 +1021,27 @@ class LAMMPS():
             else:
                 fix_command = 'bond/create'
 
-            fix_bcreate_temp = 'fix bcreate%i_%i all %s %i %i %i %f %i' % (
-                (i+1), j, fix_command, param['Nevery'], param['iatom'], param['jatom'], param['Rmin'], param['bondtype'])
+            fix_bcreate_temp = f"fix bcreate{i+1}_{j} all {fix_command} {param['Nevery']} {param['iatom']} {param['jatom']} {param['Rmin']:f} {param['bondtype']}"
 
             if 'iparam_maxbond' in param and 'iparam_atomtype' in param:
-                fix_bcreate_temp += ' iparam %i %i' % (param['iparam_maxbond'], param['iparam_atomtype'])
+                fix_bcreate_temp += f" iparam {param['iparam_maxbond']} {param['iparam_atomtype']}"
             if 'jparam_maxbond' in param and 'jparam_atomtype' in param:
-                fix_bcreate_temp += ' jparam %i %i' % (param['jparam_maxbond'], param['jparam_atomtype'])
+                fix_bcreate_temp += f" jparam {param['jparam_maxbond']} {param['jparam_atomtype']}"
             if 'prob' in param:
-                fix_bcreate_temp += ' prob %f %i' % (param['prob'], param['seed'])
+                fix_bcreate_temp += f" prob {param['prob']} {param['seed']}"
             if 'angletype' in param:
-                fix_bcreate_temp += ' atype %i' % (param['angletype'])
+                fix_bcreate_temp += f" atype {param['angletype']}"
             if 'dihedtype' in param:
-                fix_bcreate_temp += ' dtype %i' % (param['dihedtype'])
+                fix_bcreate_temp += f" dtype {param['dihedtype']}"
             if 'improtype' in param:
-                fix_bcreate_temp += ' itype %i' % (param['improtype'])
+                fix_bcreate_temp += f" itype {param['improtype']}"
             if 'aconstrain_min' in param and 'aconstrain_max' in param:
-                fix_bcreate_temp += ' aconstrain %i %i' % (param['aconstrain_min'], param['aconstrain_max'])
+                fix_bcreate_temp += f" aconstrain {param['aconstrain_min']} {param['aconstrain_max']}"
             indata.append(fix_bcreate_temp)
 
-            unfix.append('unfix bcreate%i_%i' % ((i+1), j))
+            unfix.append(f'unfix bcreate{i+1}_{j}')
 
-            wf.thermo_style += ['f_bcreate%i_%i[1]' % ((i+1), j), 'f_bcreate%i_%i[2]' % ((i+1), j)]
+            wf.thermo_style += [f'f_bcreate{i+1}_{j}[1]', f'f_bcreate{i+1}_{j}[2]']
 
         return indata, unfix, i
 # ******************************************************************
@@ -1359,7 +1351,7 @@ class Analyze():
             self.dfs = dfs
         except Exception as e:
             self.dfs = dfs = None
-            utils.radon_print('Can not read log file. %s; %s' % (log_file, e), level=2)
+            utils.radon_print(f'Can not read log file. {log_file}; {e}', level=2)
 
         return dfs
 
@@ -1501,7 +1493,7 @@ class Analyze():
         if len(thermo_df) < last: last = 0
         
         if init >= len(thermo_df):
-            utils.radon_print('init=%i is out of range. Require init < %i' % (init, len(thermo_df)), level=3)
+            utils.radon_print(f'init={init} is out of range. Require init < {len(thermo_df)}', level=3)
             return None
 
         data_conv = thermo_df[target] * conv_a + conv_b
@@ -1526,9 +1518,9 @@ class Analyze():
             ax.errorbar(thermo_df['Time'].values[init:last]*ps, data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
             ax.set_ylabel(ylabel, fontsize=12)
-            output = 'Accumulation of %f - %f ps\n' % (data['init'], data['last'])
-            output += '%s = %e     SD = %e    SE = %e\n' % (ylabel, data['mean'], data['sd'], data['se'])
-            output += 'SMA_SD = %e     SMA_SE = %e\n' % (data['sma_sd'], data['sma_se'])
+            output = f"Accumulation of {data['init']:f} - {data['last']:f} ps\n"
+            output += f"{ylabel} = {data['mean']:e}     SD = {data['sd']:e}    SE = {data['se']:e}\n"
+            output += f"SMA_SD = {data['sma_sd']:e}     SMA_SE = {data['sma_se']:e}\n"
 
             if printout:
                 plt.show()
@@ -1594,11 +1586,11 @@ class Analyze():
 
         n = len(thermo_df) - init
         if n <= 0:
-            utils.radon_print('init=%i is out of range. Require init > %i' % (init, len(thermo_df)), level=3)
+            utils.radon_print(f'init={init} is out of range. Require init > {len(thermo_df)}', level=3)
             return None
 
         if init < f_width:
-            utils.radon_print('init=%i, f_width=%i is out of range. Require init >= f_width' % (init, f_width), level=3)
+            utils.radon_print(f'init={init}, f_width={f_width} is out of range. Require init >= f_width', level=3)
             return None
 
         for i in range(n):
@@ -1631,9 +1623,9 @@ class Analyze():
             ax.errorbar(prop_df['Time'].values[:last]*ps, data_sma.values, yerr=data_se.values*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
             ax.set_ylabel(ylabel, fontsize=12)
-            output = 'Accumulation of %f - %f ps\n' % (data['init'], data['last'])
-            output += '%s = %e     SD = %e    SE = %e\n' % (ylabel, data['mean'], data['sd'], data['se'])
-            output += 'SMA_SD = %e     SMA_SE = %e\n' % (data['sma_sd'], data['sma_se'])
+            output = f"Accumulation of {data['init']:f} - {data['last']:f} ps\n"
+            output += f"{ylabel} = {data['mean']:e}     SD = {data['sd']:e}    SE = {data['se']:e}\n"
+            output += f"SMA_SD = {data['sma_sd']:e}     SMA_SE = {data['sma_se']:e}\n"
 
             if printout:
                 plt.show()
@@ -2089,7 +2081,7 @@ class Analyze():
             if 'dump' in traj_file: traj_type = 'dump'
             elif 'xtc' in traj_file: traj_type = 'xtc'
             else:
-                utils.radon_print('read_traj can not specified the format of trajectory file %s' % traj_file, level=3)
+                utils.radon_print(f'read_traj can not specified the format of trajectory file {traj_file}', level=3)
                 return None
 
         if traj_type == 'dump':
@@ -2117,7 +2109,7 @@ class Analyze():
         elif prop == 'rmsd':
             #prop_data = pd.Series(mdtraj.rmsd(traj, traj, frame=0), index=traj.time)
             for i in range(traj.n_chains):
-                atom_list = traj.topology.select("chainid %s" % (i))
+                atom_list = traj.topology.select(f"chainid {i}")
                 traj_tmp = traj.atom_slice(atom_list)
                 prop_tmp = mdtraj.rmsd(traj_tmp, traj_tmp, frame=0)
                 chain_prop_data.append(prop_tmp)
@@ -2130,7 +2122,7 @@ class Analyze():
             res1 = 0
             res2 = 0
             for i in range(traj.n_chains):
-                atom_list = traj.topology.select("chainid %s" % (i))
+                atom_list = traj.topology.select(f"chainid {i}")
                 traj_tmp = traj.atom_slice(atom_list)
 
                 for j, r in enumerate(traj_tmp.topology.residues):
@@ -2149,7 +2141,7 @@ class Analyze():
         elif prop == 'rg':
             #prop_data = pd.Series(mdtraj.compute_rg(traj), index=traj.time)
             for i in range(traj.n_chains):
-                atom_list = traj.topology.select("chainid %s" % (i))
+                atom_list = traj.topology.select(f"chainid {i}")
                 traj_tmp = traj.atom_slice(atom_list)
                 prop_tmp = mdtraj.compute_rg(traj_tmp)
                 chain_prop_data.append(prop_tmp)
@@ -2260,12 +2252,12 @@ class Analyze():
                 ax.errorbar(data_sma.index[init:last], data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
             ax.set_ylabel(ylabel, fontsize=12)
-            output = 'Accumulation of %f - %f ps\n' % (data['init'], data['last'])
+            output = f"Accumulation of {data['init']:f} - {data['last']:f} ps\n"
             if prop in ['dielectric', 'compressibility', 'expansion']:
-                output += '%s = %e' % (ylabel, data['mean'])
+                output += f"{ylabel} = {data['mean']:e}"
             else:
-                output += '%s = %e     SD = %e    SE = %e' % (ylabel, data['mean'], data['sd'], data['se'])
-                output += 'SMA_SD = %e     SMA_SE = %e' % (data['sma_sd'], data['sma_se'])
+                output += f"{ylabel} = {data['mean']:e}     SD = {data['sd']:e}    SE = {data['se']:e}"
+                output += f"SMA_SD = {data['sma_sd']:e}     SMA_SE = {data['sma_se']:e}"
             
             if printout:
                 plt.show()
@@ -2305,7 +2297,7 @@ class Analyze():
             dfs = cls.parse_ave(ave_data)
         except Exception as e:
             dfs = None
-            utils.radon_print('Can not read average file. %s; %s' % (ave_file, e), level=2)
+            utils.radon_print(f'Can not read average file. {ave_file}; {e}', level=2)
 
         return dfs
 
@@ -2384,7 +2376,7 @@ class Analyze():
         if rg_file is None: rg_file = self.rg_file
         df = self.read_ave(rg_file)
         if df is None:
-            utils.radon_print('Fail to calculate radius of gyration. %s' % (rg_file), level=2)
+            utils.radon_print(f'Fail to calculate radius of gyration. {rg_file}', level=2)
             return None
 
         rg = []
@@ -2670,8 +2662,8 @@ class Analyze():
 
         if self.totene_data.get('sma_sd') is not None and self.totene_data.get('mean') is not None and self.totene_sma_sd_crit is not None:
             if self.totene_data['sma_sd'] > abs(self.totene_data['mean']) * self.totene_sma_sd_crit:
-                utils.radon_print('Total energy does not converge. mean = %f, sma_sd = %f'
-                    % (self.totene_data['mean'], self.totene_data['sma_sd']), level=2)
+                utils.radon_print(f"Total energy does not converge. "
+                                  f"mean = {self.totene_data['mean']:f}, sma_sd = {self.totene_data['sma_sd']:f}", level=2)
                 check = False
         elif self.totene_sma_sd_crit is None: pass
         else:
@@ -2680,8 +2672,8 @@ class Analyze():
 
         if self.kinene_data.get('sma_sd') is not None and self.kinene_data.get('mean') and self.kinene_sma_sd_crit is not None:
             if self.kinene_data['sma_sd'] > abs(self.kinene_data['mean']) * self.kinene_sma_sd_crit:
-                utils.radon_print('Kinetic energy does not converge. mean = %f, sma_sd = %f'
-                    % (self.kinene_data['mean'], self.kinene_data['sma_sd']), level=2)
+                utils.radon_print(f"Kinetic energy does not converge. "
+                                  f"mean = {self.kinene_data['mean']:f}, sma_sd = {self.kinene_data['sma_sd']:f}", level=2)
                 check = False
         elif self.kinene_sma_sd_crit is None: pass
         else:
@@ -2689,8 +2681,8 @@ class Analyze():
 
         if self.ebond_data.get('sma_sd') is not None and self.ebond_data.get('mean') is not None and self.ebond_sma_sd_crit is not None:
             if self.ebond_data['sma_sd'] > abs(self.ebond_data['mean']) * self.ebond_sma_sd_crit:
-                utils.radon_print('Potential energy of bonds does not converge. mean = %f, sma_sd = %f'
-                    % (self.ebond_data['mean'], self.ebond_data['sma_sd']), level=2)
+                utils.radon_print(f"Potential energy of bonds does not converge. "
+                                  f"mean = {self.ebond_data['mean']:f}, sma_sd = {self.ebond_data['sma_sd']:f}", level=2)
                 check = False
         elif self.ebond_sma_sd_crit is None: pass
         else:
@@ -2699,8 +2691,8 @@ class Analyze():
 
         if self.eangle_data.get('sma_sd') is not None and self.eangle_data.get('mean') is not None and self.eangle_sma_sd_crit is not None:
             if self.eangle_data['sma_sd'] > abs(self.eangle_data['mean']) * self.eangle_sma_sd_crit:
-                utils.radon_print('Potential energy of angles does not converge. mean = %f, sma_sd = %f'
-                    % (self.eangle_data['mean'], self.eangle_data['sma_sd']), level=2)
+                utils.radon_print(f"Potential energy of angles does not converge. "
+                                  f"mean = {self.eangle_data['mean']:f}, sma_sd = {self.eangle_data['sma_sd']:f}", level=2)
                 check = False
         elif self.eangle_sma_sd_crit is None: pass
         else:
@@ -2709,8 +2701,8 @@ class Analyze():
 
         if self.edihed_data.get('sma_sd') is not None and self.edihed_data.get('mean') is not None and self.edihed_sma_sd_crit is not None:
             if self.edihed_data['sma_sd'] > abs(self.edihed_data['mean']) * self.edihed_sma_sd_crit:
-                utils.radon_print('Potential energy of dihedrals does not converge. mean = %f, sma_sd = %f'
-                    % (self.edihed_data['mean'], self.edihed_data['sma_sd']), level=2)
+                utils.radon_print(f"Potential energy of dihedrals does not converge. "
+                                  f"mean = {self.edihed_data['mean']:f}, sma_sd = {self.edihed_data['sma_sd']:f}", level=2)
                 check = False
         elif self.edihed_sma_sd_crit is None: pass
         else:
@@ -2719,8 +2711,8 @@ class Analyze():
 
         if self.evdw_data.get('sma_sd') is not None and self.evdw_sma_sd_crit is not None:
             if self.evdw_data['sma_sd'] > self.evdw_sma_sd_crit:
-                utils.radon_print('Potential energy of vdW interactions does not converge. mean = %f, sma_sd = %f'
-                    % (self.evdw_data['mean'], self.evdw_data['sma_sd']), level=2)
+                utils.radon_print(f"Potential energy of vdW interactions does not converge. "
+                                  f"mean = {self.evdw_data['mean']:f}, sma_sd = {self.evdw_data['sma_sd']:f}", level=2)
                 check = False
         elif self.evdw_sma_sd_crit is None: pass
         else:
@@ -2729,8 +2721,8 @@ class Analyze():
 
         if self.ecoul_data.get('sma_sd') is not None and self.ecoul_sma_sd_crit is not None:
             if self.ecoul_data['sma_sd'] > self.ecoul_sma_sd_crit:
-                utils.radon_print('Potential energy of coulomb interactions does not converge. mean = %f, sma_sd = %f'
-                    % (self.ecoul_data['mean'], self.ecoul_data['sma_sd']), level=2)
+                utils.radon_print(f"Potential energy of coulomb interactions does not converge. "
+                                  f"mean = {self.ecoul_data['mean']:f}, sma_sd = {self.ecoul_data['sma_sd']:f}", level=2)
                 check = False
         elif self.ecoul_sma_sd_crit is None: pass
         else:
@@ -2739,8 +2731,8 @@ class Analyze():
 
         if self.elong_data.get('sma_sd') is not None and self.elong_data.get('mean') is not None and self.elong_sma_sd_crit is not None:
             if self.elong_data['sma_sd'] > abs(self.elong_data['mean']) * self.elong_sma_sd_crit:
-                utils.radon_print('Potential energy of KSpace does not converge. mean = %f, sma_sd = %f'
-                    % (self.elong_data['mean'], self.elong_data['sma_sd']), level=2)
+                utils.radon_print(f"Potential energy of KSpace does not converge. "
+                                  f"mean = {self.elong_data['mean']:f}, sma_sd = {self.elong_data['sma_sd']:f}", level=2)
                 check = False
         elif self.elong_sma_sd_crit is None: pass
         else:
@@ -2748,8 +2740,8 @@ class Analyze():
 
         if self.dens_data.get('sma_sd') is not None and self.dens_data.get('mean') is not None and self.dens_sma_sd_crit is not None:
             if self.dens_data['sma_sd'] > self.dens_data['mean'] * self.dens_sma_sd_crit:
-                utils.radon_print('Density does not converge. mean = %f, sma_sd = %f'
-                    % (self.dens_data['mean'], self.dens_data['sma_sd']), level=2)
+                utils.radon_print(f"Density does not converge. "
+                                  f"mean = {self.dens_data['mean']:f}, sma_sd = {self.dens_data['sma_sd']:f}", level=2)
                 check = False
         elif self.dens_sma_sd_crit is None: pass
         else:
@@ -2758,8 +2750,8 @@ class Analyze():
 
         if self.rg_data.get('sd_max') is not None and self.rg_data.get('mean_mean') is not None and self.rg_sd_crit is not None:
             if self.rg_data['sd_max'] > self.rg_data['mean_mean'] * self.rg_sd_crit:
-                utils.radon_print('Radius of gyration does not converge. mean = %f, sd = %f'
-                    % (self.rg_data['mean_mean'], self.rg_data['sd_max']), level=2)
+                utils.radon_print(f"Radius of gyration does not converge. "
+                                  f"mean = {self.rg_data['mean_mean']:f}, sd = {self.rg_data['sd_max']:f}", level=2)
                 check = False
         elif self.rg_sd_crit is None: pass
         else:
@@ -2767,8 +2759,8 @@ class Analyze():
 
         if self.diffc_data.get('sma_sd') is not None and self.diffc_data.get('mean') is not None and self.diffc_sma_sd_crit is not None:
             if self.diffc_data['sma_sd'] > self.diffc_data['mean'] * self.diffc_sma_sd_crit:
-                utils.radon_print('Self-diffusion coefficient does not converge. mean = %f, sma_sd = %f'
-                    % (self.diffc_data['mean'], self.diffc_data['sma_sd']), level=2)
+                utils.radon_print(f"Self-diffusion coefficient does not converge. "
+                                  f"mean = {self.diffc_data['mean']:f}, sma_sd = {self.diffc_data['sma_sd']:f}", level=2)
                 check = False
         elif self.diffc_sma_sd_crit is None: pass
         else:
@@ -2776,8 +2768,8 @@ class Analyze():
 
         if self.Cp_data.get('sma_sd') is not None and self.Cp_data.get('mean') is not None and self.Cp_sma_sd_crit is not None:
             if self.Cp_data['sma_sd'] > self.Cp_data['mean'] * self.Cp_sma_sd_crit:
-                utils.radon_print('Cp does not converge. mean = %f, sma_sd = %f'
-                    % (self.Cp_data['mean'], self.Cp_data['sma_sd']), level=2)
+                utils.radon_print(f"Cp does not converge. "
+                                  f"mean = {self.Cp_data['mean']:f}, sma_sd = {self.Cp_data['sma_sd']:f}", level=2)
                 check = False
         elif self.Cp_sma_sd_crit is None: pass
         else:
@@ -2785,8 +2777,8 @@ class Analyze():
 
         if self.compress_T_data.get('sma_sd') is not None and self.compress_T_data.get('mean') is not None and self.compress_sma_sd_crit is not None:
             if self.compress_T_data['sma_sd'] > self.compress_T_data['mean'] * self.compress_sma_sd_crit:
-                utils.radon_print('Compressibility does not converge. mean = %f, sma_sd = %f'
-                    % (self.compress_T_data['mean'], self.compress_T_data['sma_sd']), level=2)
+                utils.radon_print(f"Compressibility does not converge. "
+                                  f"mean = {self.compress_T_data['mean']:f}, sma_sd = {self.compress_T_data['sma_sd']:f}", level=2)
                 check = False
         elif self.compress_sma_sd_crit is None: pass
         else:
@@ -2794,12 +2786,13 @@ class Analyze():
 
         if self.volume_exp_data.get('sma_sd') is not None and self.volume_exp_data.get('mean') is not None and self.volexp_sma_sd_crit is not None:
             if self.volume_exp_data['sma_sd'] > self.volume_exp_data['mean'] * self.volexp_sma_sd_crit:
-                utils.radon_print('Volumetric thermal expantion coefficient does not converge. mean = %f, sma_sd = %f'
-                    % (self.volume_exp_data['mean'], self.volume_exp_data['sma_sd']), level=2)
+                utils.radon_print(f"Volumetric thermal expantion coefficient does not converge. "
+                                  f"mean = {self.volume_exp_data['mean']:f}, sma_sd = {self.volume_exp_data['sma_sd']:f}", level=2)
                 check = False
         elif self.volexp_sma_sd_crit is None: pass
         else:
-            utils.radon_print('Can not obtain the data of volumetric thermal expantion coefficient. Skip to check the volumetric thermal expantion coefficient convergence.', level=2)
+            utils.radon_print('Can not obtain the data of volumetric thermal expantion coefficient. '
+                              'Skip to check the volumetric thermal expantion coefficient convergence.', level=2)
 
         return check
 
@@ -2856,14 +2849,14 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
     for atom in mol.GetAtoms():
         if atom.GetSymbol() == 'H' and atom.GetIsotope() >= 3:
             if atom.HasProp('CL_remove') and atom.GetBoolProp('CL_remove'):
-                ptype = '%s,0,cl_remove' % atom.GetProp('ff_type')
+                ptype = f"{atom.GetProp('ff_type')},0,cl_remove"
             else:
-                ptype = '%s,0' % atom.GetProp('ff_type')
+                ptype = f"{atom.GetProp('ff_type')},0"
         else:
             if atom.HasProp('CL_react') and atom.GetBoolProp('CL_react'):
-                ptype = '%s,%i,cl_react' % (atom.GetProp('ff_type'), atom.GetIsotope())
+                ptype = f"{atom.GetProp('ff_type')},{atom.GetIsotope()},cl_react"
             else:
-                ptype = '%s,%i' % (atom.GetProp('ff_type'), atom.GetIsotope())
+                ptype = f"{atom.GetProp('ff_type')},{atom.GetIsotope()}"
             
         if ptype in unique_ptype:
             atom.SetIntProp('ff_type_num', unique_ptype.index(ptype)+1)
@@ -2880,7 +2873,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
             if mol.GetProp('pair_style') == 'lj':
                 p_coeff.append([atom.GetDoubleProp('ff_epsilon'), atom.GetDoubleProp('ff_sigma')])
             else:
-                utils.radon_print('pair_style %s is not available.' % mol.GetProp('pair_style'), level=3)
+                utils.radon_print(f"pair_style {mol.GetProp('pair_style')} is not available.", level=3)
             atom.SetIntProp('ff_type_num', ip)
 
             if atom.HasProp('CL_react') and atom.GetBoolProp('CL_react'):
@@ -2910,7 +2903,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
             if mol.GetProp('bond_style') == 'harmonic':
                 b_coeff.append([bond.GetDoubleProp('ff_k'), bond.GetDoubleProp('ff_r0')])
             else:
-                utils.radon_print('bond_style %s is not available.' % mol.GetProp('bond_style'), level=3)
+                utils.radon_print(f"bond_style {mol.GetProp('bond_style')} is not available.", level=3)
             bond.SetIntProp('ff_type_num', ib)
 
     unique_atype = []
@@ -2929,7 +2922,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
                 if mol.GetProp('angle_style') == 'harmonic':
                     a_coeff.append([angle.ff.k, angle.ff.theta0])
                 else:
-                    utils.radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
+                    utils.radon_print(f"angle_style {mol.GetProp('angle_style')} is not available.", level=3)
                 angle.ff.type_num = ia
 
     unique_dtype = []
@@ -2955,7 +2948,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
                 elif mol.GetProp('dihedral_style') == 'charmm':
                     d_coeff.append([dihedral.ff.k, dihedral.ff.d0, dihedral.ff.n, dihedral.ff.w])
                 else:
-                    utils.radon_print('dihedral_style %s is not available.' % mol.GetProp('dihedral_style'), level=3)
+                    utils.radon_print(f"dihedral_style {mol.GetProp('dihedral_style')} is not available.", level=3)
                 dihedral.ff.type_num = i_d
 
     unique_itype = []
@@ -2976,7 +2969,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
                 elif mol.GetProp('improper_style') == 'umbrella':
                     i_coeff.append([improper.ff.k, improper.ff.x0])
                 else:
-                    utils.radon_print('improper_style %s is not available.' % mol.GetProp('improper_style'), level=3)
+                    utils.radon_print(f"improper_style {mol.GetProp('improper_style')} is not available.", level=3)
                 improper.ff.type_num = ii
 
     unique_ctype = []
@@ -3002,36 +2995,36 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         cl_param_list[i]['jatom_remove'] = CL_remove_atomtype_dict[cl_params['label2']]
 
         # Add new atom type after bond create
-        unique_ptype.append('%s,cl_new_atom' % (cl_params['iparam_fftype']))
-        unique_ptype.append('%s,cl_new_atom' % (cl_params['jparam_fftype']))
+        unique_ptype.append("{cl_params['iparam_fftype']},cl_new_atom")
+        unique_ptype.append("{cl_params['jparam_fftype']},cl_new_atom")
         p_mass.append(cl_params['iparam_mass'])
         p_mass.append(cl_params['jparam_mass'])
         if mol.GetProp('pair_style') == 'lj':
             p_coeff.append([cl_params['iparam_epsilon'], cl_params['iparam_sigma']])
             p_coeff.append([cl_params['jparam_epsilon'], cl_params['jparam_sigma']])
         else:
-            utils.radon_print('pair_style %s is not available.' % mol.GetProp('pair_style'), level=3)
+            utils.radon_print(f"pair_style {mol.GetProp('pair_style')} is not available.", level=3)
         cl_param_list[i]['iparam_atomtype'] = ip+1
         cl_param_list[i]['jparam_atomtype'] = ip+2
         ip += 2
 
         # Add new bond type after bond create
         ib += 1
-        unique_btype.append('%s,cl_new_bond' % (cl_params['bond_fftype']))
+        unique_btype.append(f"{cl_params['bond_fftype']},cl_new_bond")
         if mol.GetProp('bond_style') == 'harmonic':
             b_coeff.append([cl_params['bond_k'], cl_params['bond_r0']])
         else:
-            utils.radon_print('bond_style %s is not available.' % mol.GetProp('bond_style'), level=3)
+            utils.radon_print(f"bond_style {mol.GetProp('bond_style')} is not available.", level=3)
         cl_param_list[i]['bondtype'] = ib
 
         # Add new bond type after bond create
         if 'angle_k' in cl_params and 'angle_theta0' in cl_params:
             ia += 1
-            unique_atype.append('*%s*,cl_new_angle' % cl_params['bond_fftype'])
+            unique_atype.append(f"*{cl_params['bond_fftype']}*,cl_new_angle")
             if mol.GetProp('angle_style') == 'harmonic':
                 a_coeff.append([cl_params['angle_k'], cl_params['angle_theta0']])
             else:
-                utils.radon_print('angle_style %s is not available.' % mol.GetProp('angle_style'), level=3)
+                utils.radon_print(f"angle_style {mol.GetProp('angle_style')} is not available.", level=3)
             cl_param_list[i]['angletype'] = ia
     #####################################################################################################
 
@@ -3041,40 +3034,40 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
     lines = []
     lines.append('Generated by RadonPy')
     lines.append('')
-    lines.append('%i atoms' % (mol.GetNumAtoms()))
+    lines.append(f'{mol.GetNumAtoms()} atoms')
     if len(unique_ptype) > 0:
-        lines.append('%i atom types' % (len(unique_ptype)))
+        lines.append(f'{len(unique_ptype)} atom types')
 
     if len(unique_btype) > 0:
-        lines.append('%i bonds' % (mol.GetNumBonds()))
-        lines.append('%i bond types' % (len(unique_btype)))
+        lines.append(f'{mol.GetNumBonds()} bonds')
+        lines.append(f'{len(unique_btype)} bond types')
 
     if len(unique_atype) > 0:
-        lines.append('%i angles' % (len(mol.angles)))
-        lines.append('%i angle types' % (len(unique_atype)))
+        lines.append(f'{len(mol.angles)} angles')
+        lines.append(f'{len(unique_atype)} angle types')
 
     if len(unique_dtype) > 0:
-        lines.append('%i dihedrals' % (len(mol.dihedrals)))
-        lines.append('%i dihedral types' % (len(unique_dtype)))
+        lines.append(f'{len(mol.dihedrals)} dihedrals')
+        lines.append(f'{len(unique_dtype)} dihedral types')
         
     if len(unique_itype) > 0:
-        lines.append('%i impropers' % (len(mol.impropers)))
-        lines.append('%i improper types' % (len(unique_itype)))
+        lines.append(f'{len(mol.impropers)} impropers')
+        lines.append(f'{len(unique_itype)} improper types')
 
     if len(unique_ctype) > 0:
-        lines.append('%i crossterms' % (len(mol.cmaps)))
+        lines.append(f'{len(mol.cmaps)} crossterms')
         
     if hasattr(mol, 'cell'):
         lines.append('')
-        lines.append('%.16e %.16e xlo xhi' % (mol.cell.xlo, mol.cell.xhi))
-        lines.append('%.16e %.16e ylo yhi' % (mol.cell.ylo, mol.cell.yhi))
-        lines.append('%.16e %.16e zlo zhi' % (mol.cell.zlo, mol.cell.zhi))
+        lines.append(f'{mol.cell.xlo:.16e} {mol.cell.xhi:.16e} xlo xhi')
+        lines.append(f'{mol.cell.ylo:.16e} {mol.cell.yhi:.16e} ylo yhi')
+        lines.append(f'{mol.cell.zlo:.16e} {mol.cell.zhi:.16e} zlo zhi')
     else:
         xhi, xlo, yhi, ylo, zhi, zlo = poly.calc_cell_length([mol], [1], fit='max_cubic', margin=(5,5,5), confId=confId)
         lines.append('')
-        lines.append('%.16e %.16e xlo xhi' % (xlo, xhi))
-        lines.append('%.16e %.16e ylo yhi' % (ylo, yhi))
-        lines.append('%.16e %.16e zlo zhi' % (zlo, zhi))
+        lines.append(f'{xlo:.16e} {xhi:.16e} xlo xhi')
+        lines.append(f'{ylo:.16e} {yhi:.16e} ylo yhi')
+        lines.append(f'{zlo:.16e} {zhi:.16e} zlo zhi')
 
     if len(unique_ptype) > 0:
         lines.append('')
@@ -3083,18 +3076,18 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
 
         for i, ptype in enumerate(unique_ptype):
             if 0.0 < p_mass[i] and p_mass[i] < 1.0e-5:
-                lines.append('%5d\t%e\t# %s' % (i+1, p_mass[i], ptype))
+                lines.append(f'{i+1:5d}\t{p_mass[i]:e}\t# {ptype}')
             else:
-                lines.append('%5d\t%f\t# %s' % (i+1, p_mass[i], ptype))
+                lines.append(f'{i+1:5d}\t{p_mass[i]:f}\t# {ptype}')
 
         lines.append('')
         lines.append('Pair Coeffs')
         lines.append('')
 
         for i, ptype in enumerate(unique_ptype):
-            c = '\t'.join([ '%f' % x for x in p_coeff[i] ])
-            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, p_coeff[i][0], p_coeff[i][1], ptype))
-            lines.append('%5d\t%s\t# %s' % (i+1, c, ptype))
+            c = '\t'.join([ f'{x:f}' for x in p_coeff[i] ])
+            #lines.append(f'{i+1:5d}}\t{p_coeff[i][0]:f}\t{p_coeff[i][1]:f}\t# {ptype}')
+            lines.append(f'{i+1:5d}\t{c}\t# {ptype}')
 
 
     if len(unique_btype) > 0:
@@ -3103,9 +3096,9 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         lines.append('')
 
         for i, btype in enumerate(unique_btype):
-            c = '\t'.join([ '%f' % x for x in b_coeff[i] ])
-            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, b_coeff[i][0], b_coeff[i][1], btype))
-            lines.append('%5d\t%s\t# %s' % (i+1, c, btype))
+            c = '\t'.join([ f'{x:f}' for x in b_coeff[i] ])
+            #lines.append(f'{i+1:5d}}\t{b_coeff[i][0]:f}\t{b_coeff[i][1]:f}\t# {btype}')
+            lines.append(f'{i+1:5d}\t{c}\t# {btype}')
 
 
     if len(unique_atype) > 0:
@@ -3114,9 +3107,9 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         lines.append('')
 
         for i, atype in enumerate(unique_atype):
-            c = '\t'.join([ '%f' % x for x in a_coeff[i] ])
-            #lines.append('%5d\t%f\t%f\t# %s' % (i+1, a_coeff[i][0], a_coeff[i][1], atype))
-            lines.append('%5d\t%s\t# %s' % (i+1, c, atype))
+            c = '\t'.join([ f'{x:f}' for x in a_coeff[i] ])
+            #lines.append(f'{i+1:5d}}\t{a_coeff[i][0]:f}\t{a_coeff[i][1]:f}\t# {atype}')
+            lines.append(f'{i+1:5d}\t{c}\t# {atype}')
 
 
     if len(unique_dtype) > 0:
@@ -3130,8 +3123,8 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
             #     string += '\t%f\t%i\t%f' % (d_coeff[i][j*3+1], d_coeff[i][j*3+2], d_coeff[i][j*3+3])
             # string += '\t# %s' % (dtype)
             # lines.append(string)
-            c = '\t'.join([ '%f' % x if isinstance(x, float) else '%i' % x for x in d_coeff[i]])
-            lines.append('%5d\t%s\t# %s' % (i+1, c, dtype))
+            c = '\t'.join([ f'{x:f}' if isinstance(x, float) else f'{x}' for x in d_coeff[i]])
+            lines.append(f'{i+1:5d}\t{c}\t# {dtype}')
 
 
     if len(unique_itype) > 0:
@@ -3141,8 +3134,8 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
 
         for i, itype in enumerate(unique_itype):
             #lines.append('%5d\t%f\t%i\t%i\t# %s' % (i+1, i_coeff[i][0], i_coeff[i][1], i_coeff[i][2], itype))
-            c = '\t'.join([ '%f' % x if isinstance(x, float) else '%i' % x for x in i_coeff[i] ])
-            lines.append('%5d\t%s\t# %s' % (i+1, c, itype))
+            c = '\t'.join([ f'{x:f}' if isinstance(x, float) else f'{x}' for x in i_coeff[i] ])
+            lines.append(f'{i+1:5d}\t{c}\t# {itype}')
 
 
     if mol.GetNumAtoms() > 0:
@@ -3152,9 +3145,8 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
 
         coord = mol.GetConformer(confId).GetPositions()
         for i, atom in enumerate(mol.GetAtoms()):
-            lines.append('%5d\t%i\t%i\t% .16e\t% .16e\t% .16e\t% .16e' %
-                (i+1, atom.GetIntProp('mol_id'), atom.GetIntProp('ff_type_num'), atom.GetDoubleProp('AtomicCharge'),
-                    coord[i][0], coord[i][1], coord[i][2]))
+            lines.append(f"{i+1:5d}\t{atom.GetIntProp('mol_id')}\t{atom.GetIntProp('ff_type_num')}\t"
+                         f"{atom.GetDoubleProp('AtomicCharge'): .16e}\t{coord[i][0]: .16e}\t{coord[i][1]: .16e}\t{coord[i][2]: .16e}")
 
         if velocity:
             lines.append('')
@@ -3169,7 +3161,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
                 vx = atom.GetDoubleProp('vx')
                 vy = atom.GetDoubleProp('vy')
                 vz = atom.GetDoubleProp('vz')
-                lines.append('%5d\t% .16e\t% .16e\t% .16e' % (atom.GetIdx()+1, vx, vy, vz))
+                lines.append(f'{atom.GetIdx()+1:5d}\t{vx: .16e}\t{vy: .16e}\t{vz: .16e}')
 
 
     if mol.GetNumBonds() > 0:
@@ -3178,8 +3170,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         lines.append('')
 
         for bond in mol.GetBonds():
-            lines.append('%5d\t%i\t%i\t%i' %
-                (bond.GetIdx()+1, bond.GetIntProp('ff_type_num'), bond.GetBeginAtom().GetIdx()+1, bond.GetEndAtom().GetIdx()+1))
+            lines.append(f"{bond.GetIdx()+1:5d}\t{bond.GetIntProp('ff_type_num')}\t{bond.GetBeginAtom().GetIdx()+1}\t{bond.GetEndAtom().GetIdx()+1}")
 
 
     if len(mol.angles) > 0:
@@ -3188,8 +3179,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         lines.append('')
 
         for i, angle in enumerate(mol.angles.values()):
-            lines.append('%5d\t%i\t%i\t%i\t%i' %
-                (i+1, angle.ff.type_num, angle.a+1, angle.b+1, angle.c+1))
+            lines.append(f'{i+1:5d}\t{angle.ff.type_num}\t{angle.a+1}\t{angle.b+1}\t{angle.c+1}')
 
     if len(mol.dihedrals) > 0:
         lines.append('')
@@ -3197,8 +3187,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         lines.append('')
 
         for i, dihedral in enumerate(mol.dihedrals.values()):
-            lines.append('%5d\t%i\t%i\t%i\t%i\t%i' %
-                (i+1, dihedral.ff.type_num, dihedral.a+1, dihedral.b+1, dihedral.c+1, dihedral.d+1))
+            lines.append(f'{i+1:5d}\t{dihedral.ff.type_num}\t{dihedral.a+1}\t{dihedral.b+1}\t{dihedral.c+1}\t{dihedral.d+1}')
 
 
     if len(mol.impropers) > 0:
@@ -3207,8 +3196,7 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
         lines.append('')
 
         for i, improper in enumerate(mol.impropers.values()):
-            lines.append('%5d\t%i\t%i\t%i\t%i\t%i' %
-                (i+1, improper.ff.type_num, improper.a+1, improper.b+1, improper.c+1, improper.d+1))
+            lines.append(f'{i+1:5d}\t{improper.ff.type_num}\t{improper.a+1}\t{improper.b+1}\t{improper.c+1}\t{improper.d+1}')
 
     cmap_lines = []
     if hasattr(mol, 'cmaps'):
@@ -3218,15 +3206,14 @@ def MolToLAMMPSdataBlock(mol, confId=0, velocity=True, temp=300, drude=False, cl
             lines.append('')
 
             for i, cmap in enumerate(mol.cmaps.values()):
-                lines.append('%5d\t%i\t%i\t%i\t%i\t%i\t%i' %
-                    (i+1, cmap.ff.type_num, cmap.a+1, cmap.b+1, cmap.c+1, cmap.d+1, cmap.e+1))
+                lines.append(f'{i+1:5d}\t{cmap.ff.type_num}\t{cmap.a+1}\t{cmap.b+1}\t{cmap.c+1}\t{cmap.d+1}\t{cmap.e+1}')
 
         if len(unique_ctype) > 0:
             for i, ctype in enumerate(unique_ctype):
-                cmap_lines.append('# %s' % (ctype))
+                cmap_lines.append(f'# {ctype}')
                 for j in range(24):
-                    c = '\t'.join([ '%f' % x for x in c_coeff[i][j*24:(j+1)*24]])
-                    cmap_lines.append('%s' % (c))
+                    c = '\t'.join([ f'{x:f}' for x in c_coeff[i][j*24:(j+1)*24]])
+                    cmap_lines.append(f'{c}')
 
     return lines, cmap_lines
 
@@ -3266,7 +3253,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                     flag = 'cell'
                 else:
                     vals = line.split()
-                    key = vals[1] if len(vals) == 2 else '%s %s' % (vals[1], vals[2])
+                    key = vals[1] if len(vals) == 2 else f'{vals[1]} {vals[2]}'
                     n_data[key] = int(vals[0])
 
             elif flag == 'cell':
@@ -3325,7 +3312,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                         epsilon.append(float(vals[1]))
                         sigma.append(float(vals[2]))
                     else:
-                        utils.radon_print('pair_style %s is not available.' % ff_style['pair'], level=3)
+                        utils.radon_print(f"pair_style {ff_style['pair']} is not available.", level=3)
 
             elif flag == 'bond_c':
                 if not flag2:
@@ -3339,7 +3326,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                         k_bond.append(float(vals[1]))
                         r0.append(float(vals[2]))
                     else:
-                        utils.radon_print('bond_style %s is not available.' % ff_style['bond'], level=3)
+                        utils.radon_print(f"bond_style {ff_style['bond']} is not available.", level=3)
 
             elif flag == 'angle_c':
                 if not flag2:
@@ -3353,7 +3340,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                         k_angle.append(float(vals[1]))
                         theta0.append(float(vals[2]))
                     else:
-                        utils.radon_print('angle_style %s is not available.' % ff_style['angle'], level=3)
+                        utils.radon_print(f"angle_style {ff_style['angle']} is not available.", level=3)
 
             elif flag == 'dihed_c':
                 if not flag2:
@@ -3380,7 +3367,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                         n_dih.append(float(vals[2]))
                         d0_dih.append(float(vals[3]))
                     else:
-                        utils.radon_print('dihedral_style %s is not available.' % ff_style['dihedral'], level=3)
+                        utils.radon_print(f"dihedral_style {ff_style['dihedral']} is not available.", level=3)
 
             elif flag == 'impro_c':
                 if not flag2:
@@ -3398,7 +3385,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                         k_imp.append(float(vals[1]))
                         d0_imp.append(float(vals[2]))
                     else:
-                        utils.radon_print('improper_style %s is not available.' % ff_style['improper'], level=3)
+                        utils.radon_print(f"improper_style {ff_style['improper']} is not available.", level=3)
 
             elif flag == 'atom':
                 if not flag2:
@@ -3501,7 +3488,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
             atom_tmp.SetDoubleProp('ff_epsilon', float(epsilon[atom_id[i]-1]))
             atom_tmp.SetDoubleProp('ff_sigma', float(sigma[atom_id[i]-1]))
         else:
-            utils.radon_print('pair_style %s is not available.' % ff_style['pair'], level=3)
+            utils.radon_print(f"pair_style {ff_style['pair']} is not available.", level=3)
 
         atom_tmp.SetDoubleProp('AtomicCharge', float(charge[i]))
         atom_tmp.SetIntProp('mol_id', int(mol_id[i]))
@@ -3628,7 +3615,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
             rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_k', float(k_bond[bond_id[i]-1]))
             rwmol.GetBondWithIdx(bond_idx-1).SetDoubleProp('ff_r0', float(r0[bond_id[i]-1]))
         else:
-            utils.radon_print('bond_style %s is not available.' % ff_style['bond'], level=3)
+            utils.radon_print(f"bond_style {ff_style['bond']} is not available.", level=3)
 
     if bond_order: Chem.SanitizeMol(rwmol)
     mol = rwmol.GetMol()
@@ -3638,7 +3625,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
             if ff_style['angle'] == 'harmonic':
                 angle_ff_tmp = ff_class.Angle_harmonic(ff_type=angle_id[i], k=k_angle[angle_id[i]-1], theta0=theta0[angle_id[i]-1])
             else:
-                utils.radon_print('angle_style %s is not available.' % ff_style['angle'], level=3)
+                utils.radon_print(f"angle_style {ff_style['angle']} is not available.", level=3)
             utils.add_angle(mol, angle_atom[i][0]-1, angle_atom[i][1]-1, angle_atom[i][2]-1, ff=angle_ff_tmp)
     else:
         setattr(mol, 'angles', {})
@@ -3652,7 +3639,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
                 dihed_ff_tmp = ff_class.Dihedral_harmonic(ff_type=dihed_id[i], k=k_dih[dihed_id[i]-1], d0=d0_dih[dihed_id[i]-1],
                                        n=n_dih[dihed_id[i]-1])
             else:
-                utils.radon_print('dihedral_style %s is not available.' % ff_style['dihedral'], level=3)
+                utils.radon_print(f"dihedral_style {ff_style['dihedral']} is not available.", level=3)
             utils.add_dihedral(mol, dihed_atom[i][0]-1, dihed_atom[i][1]-1, dihed_atom[i][2]-1, dihed_atom[i][3]-1, ff=dihed_ff_tmp)
     else:
         setattr(mol, 'dihedrals', {})
@@ -3664,7 +3651,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
             elif ff_style['improper'] == 'umbrella':
                 impro_ff_tmp = ff_class.Improper_umbrella(ff_type=impro_id[i], k=k_imp[impro_id[i]-1], x0=x0_imp[impro_id[i]-1])
             else:
-                utils.radon_print('improper_style %s is not available.' % ff_style['improper'], level=3)                
+                utils.radon_print(f"improper_style {ff_style['improper']} is not available.", level=3)
             utils.add_improper(mol, impro_atom[i][0]-1, impro_atom[i][1]-1, impro_atom[i][2]-1, impro_atom[i][3]-1, ff=impro_ff_tmp)
     else:
         setattr(mol, 'impropers', {})
