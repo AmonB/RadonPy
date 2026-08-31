@@ -15,7 +15,10 @@ conda activate radonpy
 conda install -c conda-forge rdkit psi4 dftd3-python resp mdtraj psutil scipy pandas matplotlib pip
 conda install -c conda-forge ambertools intermol
 git clone https://github.com/RadonPy/RadonPy.git
+# git clone https://github.com/AmonB/RadonPy.git
 pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
+# force reinstall if you update your own fork
+# pip install --no-index --find-links=./RadonPy/dist/ --force-reinstall radonpy-pypi
 conda install -c conda-forge ambertools intermol
 ```
 
