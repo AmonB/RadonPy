@@ -15,12 +15,21 @@ conda activate radonpy
 conda install -c conda-forge rdkit psi4 dftd3-python resp mdtraj psutil scipy pandas matplotlib pip
 conda install -c conda-forge ambertools intermol
 git clone https://github.com/RadonPy/RadonPy.git
-# git clone https://github.com/AmonB/RadonPy.git
 pip install --no-index --find-links=./RadonPy/dist/ radonpy-pypi
-# force reinstall if you update your own fork
-# pip install --no-index --find-links=./RadonPy/dist/ --force-reinstall radonpy-pypi
 conda install -c conda-forge ambertools intermol
 ```
+
+2.1 如果是自己的fork更新了，需要重新build一个新的wheel，现在`python -m build`使用的是pyroject.toml与旧的`setup.py`冲突所以，将`setup.py`重命名之后就可以顺利地build了
+
+```
+cd /path/to/your_fork/
+python -m build
+git clone https://github.com/AmonB/RadonPy.git
+# force reinstall if you update your own fork
+pip install --no-index --find-links=./RadonPy/dist/ --force-reinstall --no-deps radonpy-pypi
+```
+
+
 
 3.  Installation of LAMMPS by conda (有网络问题，而且好像不支持gpu加速)
 
