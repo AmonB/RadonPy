@@ -20,7 +20,36 @@ from ..ff import ff_class
 
 ### Plot global settings
 plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['mathtext.fontset'] = 'custom'
+plt.rcParams['mathtext.rm'] = 'Arial'
 # plt.rcParams['font.family'] = 'Times New Roman'
+# plt.rcParams['mathtext.rm'] = 'Times New Roman'
+
+### Color scheme
+###### Style 1
+# color1 = '#555555'
+# alpha_line = 0.25
+# color2 = '#E05638'
+# line_width = 1.5
+
+###### Style 2
+# color1 = '#7F8C8D'
+# alpha_line = 0.25
+# color2 = '#0F4C81'
+# line_width = 1.5
+
+###### Style 3
+color1 = '#95A5A6'
+alpha_line1 = 0.25
+# green
+color2 = '#1E4620'
+line_width = 1.5
+alpha_fill = 0.2
+# grey for background line
+color3 = '#7F8C8D'
+alpha_line3 = 0.8
+
+
 
 # CL Modification **************************************
 import collections
@@ -1514,13 +1543,17 @@ class Analyze():
             if not last: last = None
             fig, ax = plt.subplots(figsize=(6, 6))
             ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0), useMathText=True)
-            ax.plot(thermo_df['Time'].values[init:last]*ps, data_conv.values[init:last], linewidth=0.1)
-            ax.errorbar(thermo_df['Time'].values[init:last]*ps, data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
+            ax.plot(thermo_df['Time'].values[init:last]*ps, data_conv.values[init:last], linewidth=0.1, color=color3, alpha=alpha_line3)
+            ax.plot(thermo_df['Time'].values[init:last]*ps, data_sma.values[init:last],linewidth=line_width, color=color2)
+            ax.fill_between(thermo_df['Time'].values[init:last]*ps, data_sma.values[init:last]-data_se.values[init:last]*2,
+                            data_sma.values[init:last]+data_se.values[init:last]*2, color=color2, alpha=alpha_fill)
+            # ax.errorbar(thermo_df['Time'].values[init:last]*ps, data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
             ax.set_ylabel(ylabel, fontsize=12)
             output = f"Accumulation of {data['init']:f} - {data['last']:f} ps\n"
             output += f"{ylabel} = {data['mean']:e}     SD = {data['sd']:e}    SE = {data['se']:e}\n"
             output += f"SMA_SD = {data['sma_sd']:e}     SMA_SE = {data['sma_se']:e}\n"
+            plt.tight_layout()
 
             if printout:
                 plt.show()
@@ -1619,13 +1652,17 @@ class Analyze():
             if not last: last = None
             fig, ax = plt.subplots(figsize=(6, 6))
             ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0), useMathText=True)
-            ax.plot(prop_df['Time'].values[:last]*ps, data_conv.values[:last], linewidth=1.0)
-            ax.errorbar(prop_df['Time'].values[:last]*ps, data_sma.values, yerr=data_se.values*2, linewidth=2.0)
+            ax.plot(prop_df['Time'].values[:last]*ps, data_conv.values[:last], linewidth=1.0, color=color3, alpha=alpha_line3)
+            ax.plot(prop_df['Time'].values[:last]*ps, data_sma.values, linewidth=line_width, color=color2)
+            ax.fill_between(prop_df['Time'].values[:last]*ps,data_sma.values-data_se.values*2, data_sma.values+data_se.values*2,
+                            color=color2, alpha=alpha_fill)
+            # ax.errorbar(prop_df['Time'].values[:last]*ps, data_sma.values, yerr=data_se.values*2, linewidth=2.0, color=color2)
             ax.set_xlabel('Time [ps]', fontsize=12)
             ax.set_ylabel(ylabel, fontsize=12)
             output = f"Accumulation of {data['init']:f} - {data['last']:f} ps\n"
             output += f"{ylabel} = {data['mean']:e}     SD = {data['sd']:e}    SE = {data['se']:e}\n"
             output += f"SMA_SD = {data['sma_sd']:e}     SMA_SE = {data['sma_se']:e}\n"
+            plt.tight_layout()
 
             if printout:
                 plt.show()
@@ -2240,16 +2277,22 @@ class Analyze():
             ax.ticklabel_format(style="sci",  axis="y", scilimits=(0,0), useMathText=True)
 
             if prop in ['dielectric', 'compressibility', 'expansion']:
-                ax.plot(time, prop_data.values, linewidth=2.0)
+                ax.plot(time, prop_data.values, linewidth=line_width, color=color2)
             else:
-                ax.plot(traj.time[init:last], prop_data.values[init:last], linewidth=0.1)
+                ax.plot(traj.time[init:last], prop_data.values[init:last], linewidth=0.1, color=color3, alpha=alpha_line3)
 
             if prop in ['dielectric', 'compressibility', 'expansion']:
                 pass
             elif prop in ['diffusion_coeff']:
-                ax.errorbar(data_sma.index[init:last], data_sma.values[init:last], yerr=data_se.values[init+width:last]*2, linewidth=2.0)
+                ax.plot(data_sma.index[init:last], data_sma.values[init:last], linewidth=line_width, color=color2)
+                ax.fill_between(data_sma.index[init:last], data_sma.values[init:last] - data_se.values[init+width:last]*2,
+                                data_sma.values[init:last] + data_se.values[init+width:last]*2, color=color2, alpha=alpha_fill)
+                # ax.errorbar(data_sma.index[init:last], data_sma.values[init:last], yerr=data_se.values[init+width:last]*2, linewidth=2.0)
             else:
-                ax.errorbar(data_sma.index[init:last], data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
+                ax.plot(data_sma.index[init:last], data_sma.values[init:last], linewidth=line_width, color=color2)
+                ax.fill_between(data_sma.index[init:last], data_sma.values[init:last] - data_se.values[init:last]*2,
+                                data_sma.values[init:last] + data_se.values[init:last]*2, color=color2, alpha=alpha_fill)
+                # ax.errorbar(data_sma.index[init:last], data_sma.values[init:last], yerr=data_se.values[init:last]*2, linewidth=2.0)
             ax.set_xlabel('Time [ps]', fontsize=12)
             ax.set_ylabel(ylabel, fontsize=12)
             output = f"Accumulation of {data['init']:f} - {data['last']:f} ps\n"
@@ -2258,6 +2301,7 @@ class Analyze():
             else:
                 output += f"{ylabel} = {data['mean']:e}     SD = {data['sd']:e}    SE = {data['se']:e}"
                 output += f"SMA_SD = {data['sma_sd']:e}     SMA_SE = {data['sma_se']:e}"
+            plt.tight_layout()
             
             if printout:
                 plt.show()
@@ -2465,25 +2509,25 @@ class Analyze():
         self.temp_data = self.analyze_thermo('Temp', ylabel='Temperature [K]',
                             width=width, init=init, last=last, printout=printout, save=save_dir)
 
-        self.dens_data = self.analyze_thermo('Density', ylabel='Density [g/cm^3]',
+        self.dens_data = self.analyze_thermo('Density', ylabel=r'Density [$\mathrm{g/cm^3}$]',
                             width=width, init=init, last=last, printout=printout, save=save_dir)
 
         if os.path.exists(self.rg_file):
             self.rg_data = self.calc_rg(rg_file=self.rg_file, init=-width, last=last)
 
         if 'v_msd' in thermo_df.columns.tolist():
-            self.msd_data = self.analyze_thermo('v_msd', ylabel='MSD [Angstrome^2]', 
+            self.msd_data = self.analyze_thermo('v_msd', ylabel=r'MSD [$\mathrm{\AA^2}$]',
                             width=width, init=init, last=last, printout=printout, save=save_dir)
             self.diffc_data = self.analyze_thermo_fluctuation(self.self_diffusion,
-                            name='self_diffusion', ylabel='Self-diffusion coeffisient [m^2/s]', f_width=f_width,
+                            name='self_diffusion', ylabel=r'Self-diffusion coeffisient [$\mathrm{m^2/s}$]', f_width=f_width,
                             temp=temp, press=press, init=init, width=width, last=last, printout=printout, save=save_dir)
 
         self.Cp_data = self.analyze_thermo_fluctuation(self.heat_capacity_Cp,
-                            name='heat_capacity_Cp', ylabel='Heat capacity Cp [J/(kg K)]', f_width=f_width,
+                            name='heat_capacity_Cp', ylabel=r'Heat capacity $C_\mathrm{p}$ [$\mathrm{J/(kg \cdot K)}$]', f_width=f_width,
                             temp=temp, press=press, init=init, width=width, last=last, printout=printout, save=save_dir)
         
         self.Cv_data = self.analyze_thermo_fluctuation(self.heat_capacity_Cv,
-                            name='heat_capacity_Cv', ylabel='Heat capacity Cv [J/(kg K)]', f_width=f_width,
+                            name='heat_capacity_Cv', ylabel=r'Heat capacity $C_\mathrm{v}$ [$\mathrm{J/(kg \cdot K)}$]', f_width=f_width,
                             temp=temp, press=press, init=init, width=width, last=last, printout=printout, save=save_dir)
         
         self.compress_T_data = self.analyze_thermo_fluctuation(self.isothermal_compressibility,
@@ -2615,7 +2659,7 @@ class Analyze():
             self.read_traj()
             self.get_partial_charges()
 
-            self.r2, self.r2_data = self.analyze_traj(self.traj, 'r2', ylabel='<R2> [nm^2]',
+            self.r2, self.r2_data = self.analyze_traj(self.traj, 'r2', ylabel=r'<R2> [$\mathrm{nm^2}$]',
                                 width=width, init=init, last=last, printout=printout, save=save_dir, temp=temp, charges=self.charges)
 
             self.diele, self.diele_data = self.analyze_traj(self.traj, 'dielectric', ylabel='Static dielectric constant',
