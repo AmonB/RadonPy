@@ -22,6 +22,12 @@ from matplotlib import pyplot as plt
 
 __version__ = '0.1.5'
 
+### Plot global settings
+pp.rcParams['font.family'] = 'Arial'
+pp.rcParams['mathtext.fontset'] = 'custom'
+pp.rcParams['mathtext.rm'] = 'Arial'
+# plt.rcParams['font.family'] = 'Times New Roman'
+# plt.rcParams['mathtext.rm'] = 'Times New Roman'
 
 class EQMD(preset.Preset):
     def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj=True, **kwargs):
@@ -328,7 +334,7 @@ class TGMD_analyze(lammps.Analyze):
         
         if tg>temp_max or tg > 100: 
             plt.xlabel("Temperature [K]")
-            plt.ylabel("Density [g/cm3]")
+            plt.ylabel(r"Density [$\mathrm{g/cm^3}$]")
             plt.xlim( temp_min, temp_max )
             x1 = np.linspace(temp_max, tg-50, 20)
             y1 = slopes[rmse_arg][0]*x1 + slopes[rmse_arg][1]
@@ -339,6 +345,7 @@ class TGMD_analyze(lammps.Analyze):
             plt.scatter(df_mean[0], df_mean[1], color='black')
             plt.axvline(x=tg, ymin=0, ymax=2.0, linestyle="dashed", color='red', label='tg=%f'%(tg))
             plt.legend(loc='upper right')
+            plt.tight_layout()
             plt.savefig(os.path.join(self.save_dir, 'tg.png'))
             
             data = {}

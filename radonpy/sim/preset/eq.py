@@ -17,6 +17,24 @@ from ..md import MD
 
 __version__ = '1.0b2'
 
+import shutil
+
+### backup log file before run
+def backup_log_file(work_dir=None, log_file=None):
+    _ = os.path.join(work_dir, log_file)
+    if not os.path.exists(_):
+        return None
+
+    counter = 1
+    while True:
+        backup_path = f"{_}.{counter}"
+        if os.path.exists(backup_path):
+            counter += 1
+        else:
+            shutil.move(_, backup_path)
+            break
+
+
 
 class Equilibration(preset.Preset):
     def __init__(self, mol, prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj_ann=False, **kwargs):
@@ -295,35 +313,54 @@ class Annealing(Equilibration):
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
         lmp.make_dat(self.mol, file_name=self.dat_file1, confId=confId)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print('Packing simulation (eq1) by LAMMPS is running...', level=1)
-        md1 = self.packing(f_density=f_density, max_temp=max_temp, comm_cutoff=kwargs.get('comm_cutoff', 8.0), **kwargs)
-        self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.in_file1, last_str=self.last_str1, last_data=self.last_data1,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file1))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file1))
-        dt2 = datetime.datetime.now()
-        utils.radon_print(f'Complete packing simulation (eq1). Elapsed time = {str(dt2-dt1)}', level=1)
+        eq1_last_pickle = os.path.join(self.save_dir, self.pickle_file1)
+        if os.path.exists(eq1_last_pickle):
+            utils.radon_print("Packing simulation (eq1) 1 has already completed", level=1)
+            self.mol = utils.pickle_load(eq1_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print('Packing simulation (eq1) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file1)
+            md1 = self.packing(f_density=f_density, max_temp=max_temp, comm_cutoff=kwargs.get('comm_cutoff', 8.0), **kwargs)
+            self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.in_file1, last_str=self.last_str1, last_data=self.last_data1,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file1))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file1))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete packing simulation (eq1). Elapsed time = {str(dt2-dt1)}', level=1)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print('Annealing simulation (eq2) by LAMMPS is running...', level=1)
-        md2 = self.annealing(max_temp=max_temp, temp=temp, press=press, step=int(1000000*ann_step), set_init_velocity=True, **kwargs)
-        self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.in_file2, last_str=self.last_str2, last_data=self.last_data2,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file2))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file2))
-        dt2 = datetime.datetime.now()
-        utils.radon_print(f'Complete annealing simulation (eq2). Elapsed time = {str(dt2-dt1)}', level=1)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print('Sampling simulation (eq3) by LAMMPS is running...', level=1)
-        md3 = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
-        self.mol = lmp.run(md3, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
-        dt2 = datetime.datetime.now()
-        utils.radon_print(f'Complete sampling simulation (eq3). Elapsed time = {str(dt2-dt1)}', level=1)
+        eq2_last_pickle = os.path.join(self.save_dir, self.pickle_file2)
+        if os.path.exists(eq2_last_pickle):
+            utils.radon_print("Annealing simulation (eq2) has already completed", level=1)
+            self.mol = utils.pickle_load(eq2_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print('Annealing simulation (eq2) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file2)
+            md2 = self.annealing(max_temp=max_temp, temp=temp, press=press, step=int(1000000*ann_step), set_init_velocity=True, **kwargs)
+            self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.in_file2, last_str=self.last_str2, last_data=self.last_data2,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file2))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file2))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete annealing simulation (eq2). Elapsed time = {str(dt2-dt1)}', level=1)
+
+        eq_last_pickle = os.path.join(self.save_dir, self.pickle_file)
+        if os.path.exists(eq_last_pickle):
+            utils.radon_print("sampling simulation (eq3) has already completed", level=1)
+            self.mol = utils.pickle_load(eq_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print('Sampling simulation (eq3) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file)
+            md3 = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
+            self.mol = lmp.run(md3, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete sampling simulation (eq3). Elapsed time = {str(dt2-dt1)}', level=1)
 
         return self.mol
 
@@ -383,6 +420,7 @@ class EQ21step(Equilibration):
         else:
             dt1 = datetime.datetime.now()
             utils.radon_print('Packing simulation (eq1) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file1)
             md1 = self.packing(f_density=f_density, comm_cutoff=kwargs.get('comm_cutoff', 8.0), **kwargs)
             self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.in_file1, last_str=self.last_str1, last_data=self.last_data1,
                                omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
@@ -398,6 +436,7 @@ class EQ21step(Equilibration):
         else:
             dt1 = datetime.datetime.now()
             utils.radon_print('Larsen\'s 21 step compression/decompression equilibration (eq2) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file2)
             md2 = self.eq21step(max_temp=max_temp, temp=temp, press=press, max_press=max_press,
                                 step_list=step_list, press_ratio=press_ratio, time_step=time_step, set_init_velocity=True, **kwargs)
             self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.in_file2, last_str=self.last_str2, last_data=self.last_data2,
@@ -414,6 +453,7 @@ class EQ21step(Equilibration):
         else:
             dt1 = datetime.datetime.now()
             utils.radon_print('Sampling simulation (eq3) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file)
             md3 = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
             self.mol = lmp.run(md3, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
                                omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
@@ -499,15 +539,21 @@ class Additional(Equilibration):
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
         lmp.make_dat(self.mol, file_name=self.dat_file, confId=confId)
 
-        dt1 = datetime.datetime.now()
-        utils.radon_print(f'Additional equilibration (eq{self.idx}) by LAMMPS is running...', level=1)
-        md = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
-        self.mol = lmp.run(md, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
-                           omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
-        utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
-        utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
-        dt2 = datetime.datetime.now()
-        utils.radon_print(f'Complete additional equilibration (eq{self.idx}). Elapsed time = {str(dt2-dt1)}', level=1)
+        eq_last_pickle = os.path.join(self.save_dir, self.pickle_file)
+        if os.path.exists(eq_last_pickle):
+            utils.radon_print(f"Additional equilibration (eq{self.idx}) has already completed", level=1)
+            self.mol = utils.pickle_load(eq_last_pickle)
+        else:
+            dt1 = datetime.datetime.now()
+            utils.radon_print(f'Additional equilibration (eq{self.idx}) by LAMMPS is running...', level=1)
+            backup_log_file(self.work_dir, self.log_file)
+            md = self.sampling(temp=temp, press=press, step=int(1000000*eq_step), **kwargs)
+            self.mol = lmp.run(md, mol=self.mol, confId=confId, input_file=self.in_file, last_str=self.last_str, last_data=self.last_data,
+                               omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.json_file))
+            utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.pickle_file))
+            dt2 = datetime.datetime.now()
+            utils.radon_print(f'Complete additional equilibration (eq{self.idx}). Elapsed time = {str(dt2-dt1)}', level=1)
 
         return self.mol
 

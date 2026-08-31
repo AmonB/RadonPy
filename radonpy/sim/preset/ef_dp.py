@@ -21,6 +21,11 @@ import pickle
 from scipy import optimize
 from matplotlib import pyplot as plt
 plt.rcParams['font.size'] = 11
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['mathtext.fontset'] = 'custom'
+plt.rcParams['mathtext.rm'] = 'Arial'
+# plt.rcParams['font.family'] = 'Times New Roman'
+# plt.rcParams['mathtext.rm'] = 'Times New Roman'
 
 import radonpy
 from ...core import utils, const
@@ -225,6 +230,7 @@ class further_Additional(eq.Equilibration):
             ax.set_xlabel(r'Electric field / V$\mathrm{\AA}^{-1}$', fontsize=16)
             ax.set_ylabel(r'Polarization / Cm$^{-2}$', fontsize=16)
             fig.subplots_adjust(left=0.18, right=0.97, bottom=0.13, top=0.82)
+            plt.tight_layout()
             plt.show()
             plt.clf()
             plt.close()
@@ -292,6 +298,7 @@ class further_Additional(eq.Equilibration):
             ax.set_ylabel(r'Electric field / V$\mathrm{\AA}^{-1}$', fontsize=16)
             ax2.set_ylabel(r'Polarization / Cm$^{-2}$', fontsize=16)
             fig.subplots_adjust(left=0.16, right=0.84, bottom=0.12, top=0.96)
+            plt.tight_layout()
             plt.savefig(os.path.join(self.save_dir, 'ef_dp_%sGHz_%sEF_%s.png' %(self.freq_name, self.evalue, self.direction)), dpi=300)
             plt.clf()
             plt.close()

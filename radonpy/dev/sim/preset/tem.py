@@ -348,6 +348,7 @@ class NEMD_tensile_modulus_analyze(lammps.Analyze):
         output += 'Tensile viscosity (%s axis) = %f [Pa s]\n' % (axis, tensile_v)
         output += 'Shear viscosity (isotoropic) (%s axis) = %f [Pa s]\n' % (axis, shear_v)
 
+        pp.tight_layout()
         if printout:
             pp.show()
             utils.radon_print(output, level=1)
@@ -395,6 +396,7 @@ class NEMD_tensile_modulus_analyze(lammps.Analyze):
         output = 'Poisson\'s ratio %s (tensile in %s axis) = %f' % (axis1, axis, poisson_ratio1)
         output = 'Poisson\'s ratio %s (tensile in %s axis) = %f' % (axis2, axis, poisson_ratio2)
 
+        pp.tight_layout()
         if printout:
             pp.show()
             utils.print(output, level=1)

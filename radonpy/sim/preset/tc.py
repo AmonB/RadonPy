@@ -18,6 +18,12 @@ from .. import lammps, preset
 
 __version__ = '1.0b2'
 
+### Plot global settings
+pp.rcParams['font.family'] = 'Arial'
+pp.rcParams['mathtext.fontset'] = 'custom'
+pp.rcParams['mathtext.rm'] = 'Arial'
+# plt.rcParams['font.family'] = 'Times New Roman'
+# plt.rcParams['mathtext.rm'] = 'Times New Roman'
 
 class NEMD_MP(preset.Preset):
     def __init__(self, mol, axis='x', prefix='', work_dir=None, save_dir=None, solver_path=None, no_traj=False, **kwargs):
@@ -624,7 +630,7 @@ class NEMD_MP_Analyze(lammps.Analyze):
             pp.plot(coord_r*length, y2, c=color)
             pp.xlim(0, tgrads[0, -1, 0]*length)
             pp.title('T grad mean')
-            pp.xlabel('Length [Angstrom]')
+            pp.xlabel(r'Length [$\mathrm{\AA}$]')
             pp.ylabel('Temperature [K]')
             output = "T_max = %f    T_min = %f\n" % (tmax, tmin)
             if OK: output += 'OK: grad ave.(K/m) = %e,   se = %e\n' % (grad_ave, se_ave)
@@ -634,7 +640,8 @@ class NEMD_MP_Analyze(lammps.Analyze):
             output += "Right region: grad(K/m) = %e,   r2 = %f,   p = %e,   se = %e\n" %\
                         (grad2, r22, p2, se2)
             output += 'Temp SD: ' + ','.join([str(x) for x in tgrads_sd]) + '\n'
-            
+
+            pp.tight_layout()
             if printout:
                 pp.show()
                 print(output)
@@ -687,9 +694,10 @@ class NEMD_MP_Analyze(lammps.Analyze):
             pp.title('dQ/dT')
             pp.xlim(thermo_df['Time'].iloc[init:last].values[0]*1e-3, thermo_df['Time'].iloc[init:last].values[-1]*1e-3)
             pp.xlabel('Time [ps]')
-            pp.ylabel('Q [Ws/m^2]')
+            pp.ylabel(r'Q [$\mathrm{Ws/m^2}$]')
             output = 'Q grad. [W/m^2] = %e,   se = %e,   r2 = %f,   p = %e\n' % (grad, se, r2, p)
-            
+
+            pp.tight_layout()
             if printout:
                 pp.show()
                 print(output)
@@ -1688,7 +1696,8 @@ class NEMD_Langevin_Analyze(lammps.Analyze):
             if OK: output += 'OK: grad ave.(K/m) = %e,   se = %e\n' % (grad_ave, se_ave)
             else: output += 'NG: grad ave.(K/m) = %e,   se = %e\n' % (grad_ave, se_ave)
             output += "grad(K/m) = %e,   r2 = %f,   p = %e,   se = %e\n" % (grad, r2, p, se)
-            
+
+            pp.tight_layout()
             if printout:
                 pp.show()
                 print(output)
@@ -1730,10 +1739,11 @@ class NEMD_Langevin_Analyze(lammps.Analyze):
             pp.title('dQ/dT')
             pp.xlim(thermo_df['Time'].iloc[init:last].values[0]*1e-3, thermo_df['Time'].iloc[init:last].values[-1]*1e-3)
             pp.xlabel('Time [ps]')
-            pp.ylabel('Q [Ws/m^2]')
+            pp.ylabel(r'Q [$\mathrm{Ws/m^2}$]')
             output = 'Heat source: Q grad. [W/m^2] = %e,   se = %e,   r2 = %f,   p = %e\n' % (grad1, se1, r2_1, p1)
             output += "Heat sink: Q grad. [W/m^2] = %e,   se = %e,   r2 = %f,   p = %e\n" % (grad2, se2, r2_2, p2)
-            
+
+            pp.tight_layout()
             if printout:
                 pp.show()
                 print(output)
