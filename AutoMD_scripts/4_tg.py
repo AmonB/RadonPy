@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     # Tg calculation
     tgmd = tg.TGMD(mol, work_dir=work_dir, no_traj=no_traj)
-    mol, tg_results = tgmd.exec(temp=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=8e3, intel=intel, opt=opt)
+    mol, tg_results = tgmd.exec(pre_temp_start=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=2e6, intel=intel, opt=opt)
 
     # Reload MD csv data
     data = io.load_md_csv(data)
