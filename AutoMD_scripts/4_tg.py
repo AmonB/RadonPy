@@ -61,6 +61,11 @@ if __name__ == '__main__':
     tgmd = tg.TGMD(mol, work_dir=work_dir, no_traj=no_traj)
     mol, tg_results = tgmd.exec(pre_temp_start=data['temp'], mpi=mpi, omp=omp, gpu=gpu, cooling_rate=2e6, intel=intel, opt=opt)
 
+    # Tm calculation
+    # tmmd = tg.TGMD(mol, work_dir=work_dir, no_traj=no_traj)
+    # mol, tm_results = tmmd.melting(tm_temp_start=data['temp'], tm_temp_stop=data['temp']+200,
+    #                                mpi=mpi, omp=omp, gpu=gpu, cooling_rate=2e7, intel=intel, opt=opt)
+
     # Reload MD csv data
     data = io.load_md_csv(data)
 
