@@ -17,6 +17,7 @@ from rdkit import Geometry as Geom
 from ...core import calc, const, utils
 from .. import lammps, preset
 from ..md import MD
+import shutil
 
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
@@ -70,9 +71,10 @@ class EQMD(preset.Preset):
 
         self.tm_eq_in_file = kwargs.get('tm_eq_in_file', '%stm_eq.in' % self.prefix)
         self.tm_eq_log_file = kwargs.get('tm_eq_log_file', '%stm_eq.log' % self.prefix)
-        self.tm_eq_dat_file = kwargs.get('tm_eq_dat_file', '%stm_eq.dat' % self.prefix)
+        self.tm_eq_dat_file = kwargs.get('tm_eq_dat_file', '%stm_eq.data' % self.prefix)
         self.tm_eq_pickle_file = kwargs.get('tm_eq_pickle_file', '%stm_eq.pickle' % self.prefix)
         self.tm_eq_json_file = kwargs.get('tm_eq_json_file', '%stm_eq.json' % self.prefix)
+        self.tm_eq_pdb_file = kwargs.get('tm_eq_pdb_file', '%stm_eq.pdb' % self.prefix)
 
         self.tm_in_file     = kwargs.get('tm_in_file',    '%stm.in' % self.prefix)
         self.tm_log_file    = kwargs.get('tm_log_file',   '%stm.log' % self.prefix)
@@ -122,7 +124,7 @@ class EQMD(preset.Preset):
         md.thermo_freq = 100 if int(step/1000)<100 else int(step/1000) if int(step/1000)<1000 else 1000
         md.dat_file = kwargs.get('pre_dat_file',   self.pre_dat_file)
         md.log_file = kwargs.get('pre_log_file',   self.pre_log_file)
-        md.add_md('npt', step, time_step=time_step, shake=True, t_start=t_start, t_stop=t_stop,
+        md.add_md('npt', int(step), time_step=time_step, shake=True, t_start=t_start, t_stop=t_stop,
                    p_start=press, p_stop=press, p_dump=p_dump, **kwargs)
         md.write_data = kwargs.get('pre_dat_file', self.pre_dat_file)
         return md
@@ -147,7 +149,7 @@ class EQMD(preset.Preset):
         md.dat_file = kwargs.get('pre_dat_file',   self.pre_dat_file)
         if kwargs.get('set_init_velocity', False):
             md.set_init_velocity = temp
-        md.add_md('npt', step, time_step=time_step, shake=True, t_start=temp, t_stop=temp,
+        md.add_md('npt', int(step), time_step=time_step, shake=True, t_start=temp, t_stop=temp,
                    p_start=press, p_stop=press, p_dump=p_dump, **kwargs)
         md.write_data = kwargs.get('eq_dat_file', self.eq_dat_file)
 
@@ -334,7 +336,7 @@ class EQMD(preset.Preset):
         md.dat_file = kwargs.get('tm_eq_dat_file', self.tm_eq_dat_file)
         if kwargs.get('set_init_velocity', False):
             md.set_init_velocity = temp
-        md.add_md('npt', step, time_step=time_step, shake=True, t_start=temp, t_stop=temp,
+        md.add_md('npt', int(step), time_step=time_step, shake=True, t_start=temp, t_stop=temp,
                   p_start=press, p_stop=press, p_dump=p_dump, **kwargs)
         md.write_data = kwargs.get('tm_eq_dat_file', self.tm_eq_dat_file)
 
@@ -359,7 +361,7 @@ class EQMD(preset.Preset):
         md.thermo_freq = 100 if int(step / 1000) < 100 else int(step / 1000) if int(step / 1000) < 1000 else 1000
         md.log_file = kwargs.get('tm_log_file', self.tm_log_file)
         md.dat_file = kwargs.get('tm_eq_dat_file', self.tm_eq_dat_file)
-        md.add_md('npt', step, time_step=time_step, shake=True, t_start=max_temp, t_stop=min_temp,
+        md.add_md('npt', step, time_step=time_step, shake=True, t_start=min_temp, t_stop=max_temp,
                   p_start=press, p_stop=press, p_dump=p_dump, **kwargs)
         md.write_data = kwargs.get('tm_dat_file', self.tm_dat_file)
         return md
@@ -490,7 +492,7 @@ class TGMD_analyze(lammps.Analyze):
     def quench():
         print('hello')
 
-    def continuous_tm(self, min_temp, max_temp, interval_temp=10):
+    def continuous_tm(self, min_temp, max_temp, cooling_rate, interval_temp=10):
         def max_slope_interval(T, V):
             dV = np.diff(V)
             dT = np.diff(T)
@@ -499,36 +501,24 @@ class TGMD_analyze(lammps.Analyze):
             T_lower, T_upper = T[idx], T[idx+1]
             return T_lower, T_upper, idx
 
-        df = self.read_log(self.log_file)[-1]
-        temp = df['Temp'].to_numpy()
-        dens = df['Density'].to_numpy()
-        specific_volume = 1 / dens
-        edges = np.arange(min_temp, max_temp+interval_temp, interval_temp)
-        n_bins = len(edges)-1
+        df = self.read_log(self.log_file)[-1].reset_index()
+        df['v'] = 1.0 / df['Density']
 
-        temp_edge = []
-        specific_volume_mean = []
-        for i in range(n_bins):
-            lower, upper = edges[i], edges[i+1]
-            if i == 0:
-                mask = temp < upper
-            elif i == n_bins-1:
-                mask = temp >= lower
-            else:
-                mask = (temp >= lower) & (temp < upper)
-            if mask.any():
-                temp_edge.append(upper)
-                specific_volume_mean.append(specific_volume[mask].mean())
+        total_step = int(cooling_rate * (max_temp - min_temp) / interval_temp)
+        step_bins = np.arange(0, total_step + cooling_rate, cooling_rate)
+        df['Step_bin'] = pd.cut(df['Step'], step_bins)
+        results = df.groupby('Step_bin', observed=True).agg(V_mean = ('v', 'mean'),).reset_index()
 
-        T_lower, T_upper, T_idx = max_slope_interval(temp_edge, specific_volume_mean)
+        temp_bins = np.arange(min_temp, max_temp+interval_temp, interval_temp)[1:]
+        T_lower, T_upper, T_idx = max_slope_interval(temp_bins, results['V_mean'])
+
         data = {}
         data['tm_start'] = T_lower
         data['tm_end'] = T_upper
 
         # plot Tm
-        T = np.array(temp_edge)
-        V = np.array(specific_volume_mean)
-
+        T = temp_bins
+        V = results['V_mean']
         fig, ax = plt.subplots(figsize=(6, 6))
         ax.set_xlabel("Temperature [K]", fontsize=12)
         ax.set_ylabel(r"Specific Volume [$\mathrm{cm^3/g}$]", fontsize=12)
@@ -539,8 +529,8 @@ class TGMD_analyze(lammps.Analyze):
 
         V_lower = V[T_idx:T_idx + 2].min()
         V_upper = V[T_idx:T_idx + 2].max()
-        y_pad = 0.3 * (V_upper - V_lower)
-        x_pad = 0.4 * (T_lower - T_upper)
+        y_pad = 0.2 * (V_upper - V_lower)
+        x_pad = 0.2 * (T_upper - T_lower)
 
         rect_x = T_lower - x_pad
         rect_y = V_lower - y_pad
@@ -550,7 +540,7 @@ class TGMD_analyze(lammps.Analyze):
         rect = Rectangle((rect_x, rect_y), rect_w, rect_h, fill=False,
                          linewidth=1.5, linestyle='--', edgecolor='#1E4620', facecolor='none')
         ax.add_patch(rect)
-        ax.text(T_upper + 2 * x_pad, V[T_idx:T_idx + 2].mean(), f"{T_lower:.0f}~{T_upper:.0f} K",
+        ax.text(T_upper + 1.5 * x_pad, V[T_idx:T_idx + 2].mean(), f"{T_lower:.0f}~{T_upper:.0f} K",
                 fontsize=12, color='#1E4620', ha='left', va='center')
         plt.tight_layout()
         plt.savefig(os.path.join(self.save_dir, 'tm.png'))
@@ -581,6 +571,7 @@ class TGMD(EQMD):
             t_start, t_stop = pre_temp_start, pre_temp_stop
             # step = (t_stop-t_start)*pre_cooling_rate
             lmp.make_dat(self.mol, file_name=self.pre_dat_file, confId=confId)
+            backup_log_file(self.work_dir_tg, self.pre_log_file)
             for i in range(10):
                 dt1 = datetime.datetime.now()
                 utils.radon_print('Density Search algorithm (tg_pre): No%02d (%d K -> %d K)'%(i+1, t_start, t_stop), level=1)
@@ -621,6 +612,7 @@ class TGMD(EQMD):
             utils.radon_print('Equilibration (tg_eq) by LAMMPS is running...', level=1)
             md2 = self.equilibration(temp=float(self.data['tg_max_temp']), step=5e6, **kwargs)
             lmp.make_input(md2, file_name=self.eq_in_file)
+            backup_log_file(self.work_dir_tg, self.eq_log_file)
             self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.eq_in_file,omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
             dt2 = datetime.datetime.now()
             utils.radon_print('Complete Equilibration (tg_eq). Elapsed time = %s' % str(dt2-dt1), level=1)
@@ -714,6 +706,7 @@ class TGMD(EQMD):
             utils.radon_print('Tg could not be calculated in TGMD_analyze.', level=3)
         else:
             self.data.update(result)
+            pd.DataFrame(self.data, index=[0]).to_csv(os.path.join(self.save_dir, self.csv_file))
         
         return self.mol, self.data
 
@@ -724,7 +717,6 @@ class TGMD(EQMD):
         # equilibration at tm start temp
         if os.path.exists(os.path.join(self.save_dir, self.tm_eq_pickle_file)):
             self.mol = utils.pickle_load(os.path.join(self.save_dir, self.tm_eq_pickle_file))
-            self.data = pd.read_csv(os.path.join(self.save_dir, self.csv_file)).iloc[0].to_dict()
             utils.radon_print("Equilibration (tm_eq) has already completed.", level=1)
         else:
             dt1 = datetime.datetime.now()
@@ -732,11 +724,13 @@ class TGMD(EQMD):
             lmp.make_dat(self.mol, file_name=self.tm_eq_dat_file, confId=confId)
             md1 = self.equilibration_tm(temp=float(tm_temp_start), step=5e6, **kwargs)
             lmp.make_input(md1, file_name=self.tm_eq_in_file)
+            backup_log_file(self.work_dir_tg, self.tm_eq_log_file)
             self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.tm_eq_in_file,omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
             dt2 = datetime.datetime.now()
             utils.radon_print('Complete Equilibration (tm_eq). Elapsed time = %s' % str(dt2-dt1), level=1)
             utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.tm_eq_json_file))
             utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.tm_eq_pickle_file))
+            utils.MolToPDBFile(self.mol, os.path.join(self.save_dir, self.tm_eq_pdb_file))
 
         # start Tm
         if os.path.exists(os.path.join(self.save_dir, self.tm_pickle_file)):
@@ -750,21 +744,29 @@ class TGMD(EQMD):
             md2 = self.continuous_tm(min_temp=tm_temp_start, max_temp=tm_temp_stop,
                                      cooling_rate=cooling_rate, interval_temp=interval_temp)
             lmp.make_input(md2, file_name=self.tm_in_file)
+            backup_log_file(self.work_dir_tg, self.tm_log_file)
             self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.tm_in_file, omp=omp, mpi=mpi,
                                gpu=gpu, intel=intel, opt=opt)
             dt2 = datetime.datetime.now()
-            result = TGMD_analyze(log_file=os.path.join(self.work_dir_tg, self.tm_log_file),
-                                  save_dir=self.save_dir).continuous_tm(min_temp=tm_temp_start,
-                                                                        max_temp=tm_temp_stop,
-                                                                        interval_temp=interval_temp)
-
-            utils.radon_print('Complete Melting algorithm (Tm: %d K ~ %d K). '
-                              'Elapsed time = %s' % (result['tm_start'], result['tm_end'],str(dt2 - dt1)), level=1)
-
             utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.tm_json_file))
             utils.pickle_dump(self.mol, os.path.join(self.save_dir, self.tm_pickle_file))
+            utils.radon_print('Complete Melting algorithm (Tm: %d K ~ %d K). '
+                              'Elapsed time = %s' % (tm_temp_start, tm_temp_stop, str(dt2 - dt1)), level=1)
+
+        result = TGMD_analyze(log_file=os.path.join(self.work_dir_tg, self.tm_log_file),
+                              save_dir=self.save_dir).continuous_tm(min_temp=tm_temp_start,
+                                                                    max_temp=tm_temp_stop,
+                                                                    cooling_rate=cooling_rate,
+                                                                    interval_temp=interval_temp)
+
+        if result is None:
+            utils.radon_print('Tm could not be calculated in TGMD_analyze.', level=3)
+        else:
             self.data.update(result)
             pd.DataFrame(self.data, index=[0]).to_csv(os.path.join(self.save_dir, self.csv_file))
+            utils.radon_print('Melting point (Tm: %d K ~ %d K). ' % (result['tm_start'], result['tm_end']), level=1)
+
+        return self.mol, self.data
         
 class TGMD_Additional():
     '''
