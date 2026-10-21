@@ -597,10 +597,14 @@ class LAMMPS():
                     self.make_input_variable(md, wf, i, indata, unfix)
 
                 # Generate "fix ave/time"
-                if wf.timeave:
+                if wf.timeave or wf.timeave_tg:
                     indata.append('')
                     indata.append('# ave/time')
-                    self.make_input_timeave(md, wf, i, indata, unfix)
+                    if wf.timeave:
+                        self.make_input_timeave(md, wf, i, indata, unfix)
+                    if wf.timeave_tg:
+                        self.make_input_timeave_tg(md, wf, i, indata, unfix)
+
 
 
                 if len(wf.add) > 0:
@@ -608,6 +612,8 @@ class LAMMPS():
 
                 # Generate SHAKE constraint
                 if wf.shake:
+                    indata.append('')
+                    indata.append('# shake')
                     indata.append(f'fix shake{i+1} {all_nowater} shake 1e-4 1000 0 m 1.0')
                     unfix.append(f'unfix shake{i+1}')
 
@@ -646,11 +652,11 @@ class LAMMPS():
                     else:
                         indata.append(f'fix md{i+1} {all_nowater} nve/limit {wf.nve_limit}')
 
-                elif wf.ensemble == 'nvt':
+                elif wf.ensemble in ['nvt', 'nvt/sllod']:
                     indata.append('')
                     indata.append('# nvt')
                     if wf.thermostat == 'Nose-Hoover':
-                        indata.append(f'fix md{i+1} {all_nowater} nvt temp {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
+                        indata.append(f'fix md{i+1} {all_nowater} {wf.ensemble} temp {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f}')
 
                     elif wf.thermostat == 'Langevin':
                         indata.append(f'fix thermostat{i+1} all langevin {wf.t_start:f} {wf.t_stop:f} {wf.t_dump:f} {seed}')
@@ -920,6 +926,42 @@ class LAMMPS():
 
             unfix.append(f'unfix DEF{i+1}')
 
+        # EXPERIMENTAL
+        elif wf.deform == 'wiggle':
+            if wf.ensemble in ['nvt', 'nvt/sllod']:
+                indata.append('change_box all triclinic')
+                indata.append(f'kspace_style {md.kspace_style} {md.kspace_style_accuracy}')
+                indata.append('')
+                if wf.deform_axis == 'xy':
+                    indata.append('variable ly0 equal ly')
+                    indata.append('variable gamma equal xy/v_ly0')
+                    wf.thermo_style += ['v_gamma']
+                    self.make_input_wiggle(md, wf, i, indata, unfix)
+                    if wf.timeave_wiggle:
+                        indata.append('')
+                        indata.append('# ave/time')
+                        self.make_input_timeave_wiggle(md, wf, i, indata, unfix)
+
+                if wf.deform_axis == 'xz':
+                    indata.append('variable lz0 equal lz')
+                    indata.append('variable gamma equal xz/v_lz0')
+                    self.make_input_wiggle(md, wf, i, indata, unfix)
+                    if wf.timeave_wiggle:
+                        indata.append('')
+                        indata.append('# ave/time')
+                        self.make_input_timeave_wiggle(md, wf, i, indata, unfix)
+
+                if wf.deform_axis == 'yz':
+                    indata.append('variable lz0 equal lz')
+                    indata.append('variable gamma equal yz/v_lz0')
+                    self.make_input_wiggle(md, wf, i, indata, unfix)
+                    if wf.timeave_wiggle:
+                        indata.append('')
+                        indata.append('# ave/time')
+                        self.make_input_timeave_wiggle(md, wf, i, indata, unfix)
+                unfix.append(f'unfix DEF{i + 1}')
+                unfix.append(f'uncompute p_virial{i+1}')
+
         return indata, unfix
 
 
@@ -988,6 +1030,21 @@ class LAMMPS():
         return indata, unfix
 
 
+    def make_input_wiggle(self, md, wf, i, indata, unfix):
+        indata.append(f'compute P_VIRIAL{i+1} all pressure NULL virial')
+        axises = ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
+        for j in range(len(axises)):
+            indata.append(f'variable sigma_{axises[j]} equal -c_P_VIRIAL{i+1}[{(j+1)}]')
+            wf.thermo_style += ['v_sigma_'+axises[j]]
+
+        indata.append('')
+        indata.append(f'fix DEF{i + 1} all deform 1 {wf.deform_axis} wiggle {wf.deform_amplitude} {wf.deform_period}')
+        if wf.deform_remap:
+            indata[-1] += f' remap {wf.deform_remap}'
+
+        return indata, unfix
+
+
     def make_input_rg(self, md, wf, i, indata, unfix):
         indata.append(f'compute gyr{i+1} all gyration/chunk cmol{i+1}')
         indata.append(f'fix rg{i+1} all ave/time 1 {wf.rg_ave_length} {wf.rg_ave_length} c_gyr{i+1} file {wf.rg_file} mode vector')
@@ -1033,6 +1090,41 @@ class LAMMPS():
         indata.append(f'fix {wf.timeave_name} all ave/time {wf.timeave_nevery} {wf.timeave_nfreq} {wf.timeave_nstep} {var_str}')
 
         wf.thermo_style += [f'f_{wf.timeave_name}[{(j+1)}]' for j in range(len(wf.timeave_var))]
+
+        return indata, unfix
+
+
+    def make_input_timeave_tg(self, md, wf, i, indata, unfix, nounfix=False):
+        if wf.timeave_name is None:
+            wf.timeave_name = f'ave{i+1}'
+
+        if not nounfix and not wf.timeave_nounfix:
+            unfix.append(f'unfix {wf.timeave_name}')
+
+        indata.append('variable dens equal density')
+        var_str = ' '.join(['c_thermo_temp', 'v_dens'])
+        indata.append(f'fix {wf.timeave_name} all ave/time {wf.timeave_nevery} {wf.timeave_nfreq} {wf.timeave_nstep} {var_str}')
+        new_labels = ["avg_temp", "avg_density"]
+        for j in range(len(new_labels)):
+            indata.append(f'variable {new_labels[j]} equal f_{wf.timeave_name}[{(j+1)}]')
+            wf.thermo_style += [f'v_+{new_labels[j]}']
+
+        return indata, unfix
+
+
+    def make_input_timeave_wiggle(self, md, wf, i, indata, unfix, nounfix=False):
+        if wf.timeave_name is None:
+            wf.timeave_name = f'ave{i+1}'
+
+        if not nounfix and not wf.timeave_nounfix:
+            unfix.append(f'unfix {wf.timeave_name}')
+
+        var_str = ' '.join(['v_sigma_xx', 'v_sigma_yy', 'v_sigma_zz', 'v_sigma_xy', 'v_sigma_xz', 'v_sigma_yz'])
+        indata.append(f'fix {wf.timeave_name} all ave/time {wf.timeave_nevery} {wf.timeave_nfreq} {wf.timeave_nstep} {var_str}')
+        new_labels = ["avg_sigma_xx", "avg_sigma_yy", "avg_sigma_zz", "avg_sigma_xy", "avg_sigma_xz", "avg_sigma_yz"]
+        for j in range(len(new_labels)):
+            indata.append(f'variable {new_labels[j]} equal f_{wf.timeave_name}[{(j+1)}]')
+            wf.thermo_style += ['v_'+new_labels[j]]
 
         return indata, unfix
 
@@ -3284,6 +3376,7 @@ def MolFromLAMMPSdata(file_name, bond_order=True,
     k_imp = []
     n_imp = []
     d0_imp = []
+    x0_imp = []
 
     with open(file_name, "r") as fh:
         for line in fh.readlines():

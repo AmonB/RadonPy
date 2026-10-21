@@ -364,6 +364,7 @@ class EQMD(preset.Preset):
         md.add_md('npt', step, time_step=time_step, shake=True, t_start=min_temp, t_stop=max_temp,
                   p_start=press, p_stop=press, p_dump=p_dump, **kwargs)
         md.write_data = kwargs.get('tm_dat_file', self.tm_dat_file)
+        md.wf[-1].add_timeave_tg()
         return md
 
 class TGMD_analyze(lammps.Analyze):
@@ -502,7 +503,8 @@ class TGMD_analyze(lammps.Analyze):
             return T_lower, T_upper, idx
 
         df = self.read_log(self.log_file)[-1].reset_index()
-        df['v'] = 1.0 / df['Density']
+        df = df[df['v_avg_temp']>0]
+        df['v'] = 1.0 / df['v_avg_density']
 
         total_step = int(cooling_rate * (max_temp - min_temp) / interval_temp)
         step_bins = np.arange(0, total_step + cooling_rate, cooling_rate)
@@ -613,7 +615,7 @@ class TGMD(EQMD):
             md2 = self.equilibration(temp=float(self.data['tg_max_temp']), step=5e6, **kwargs)
             lmp.make_input(md2, file_name=self.eq_in_file)
             backup_log_file(self.work_dir_tg, self.eq_log_file)
-            self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.eq_in_file,omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            self.mol = lmp.run(md2, mol=self.mol, confId=confId, input_file=self.eq_in_file, omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
             dt2 = datetime.datetime.now()
             utils.radon_print('Complete Equilibration (tg_eq). Elapsed time = %s' % str(dt2-dt1), level=1)
             utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.eq_json_file))
@@ -725,7 +727,7 @@ class TGMD(EQMD):
             md1 = self.equilibration_tm(temp=float(tm_temp_start), step=5e6, **kwargs)
             lmp.make_input(md1, file_name=self.tm_eq_in_file)
             backup_log_file(self.work_dir_tg, self.tm_eq_log_file)
-            self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.tm_eq_in_file,omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
+            self.mol = lmp.run(md1, mol=self.mol, confId=confId, input_file=self.tm_eq_in_file, omp=omp, mpi=mpi, gpu=gpu, intel=intel, opt=opt)
             dt2 = datetime.datetime.now()
             utils.radon_print('Complete Equilibration (tm_eq). Elapsed time = %s' % str(dt2-dt1), level=1)
             utils.MolToJSON(self.mol, os.path.join(self.save_dir, self.tm_eq_json_file))

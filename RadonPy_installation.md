@@ -22,7 +22,13 @@ conda install -c conda-forge ambertools intermol
 cd /path/to/your_fork/
 set PYTHONUTF8=1
 python -m build
+
+# clone for the first time
 git clone https://github.com/AmonB/RadonPy.git
+# get new updates
+cd /path/to/clone
+git pull
+
 # force reinstall if you update your own fork
 pip install --no-index --find-links=./RadonPy/dist/ --force-reinstall --no-deps radonpy-pypi
 ```

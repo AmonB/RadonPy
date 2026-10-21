@@ -190,6 +190,8 @@ class Dynamics():
         self.momentum = kwargs.get('momentum', False)
         self.variable = kwargs.get('variable', False)
         self.timeave = kwargs.get('timeave', False)
+        self.timeave_wiggle = kwargs.get('timeave_wiggle', False)
+        self.timeave_tg = kwargs.get('timeave_tg', False)
         self.thermo_style = kwargs.get('thermo_style', [])
         self.thermo_freq = kwargs.get('thermo_freq', None)
         self.rerun = kwargs.get('rerun', False)
@@ -203,7 +205,7 @@ class Dynamics():
         self.add_f = kwargs.get('add_f', [])
 
 
-    def add_deform(self, dftype='scale', axis='x', **kwargs):
+    def add_deform(self, dftype='scale', axis='x', amplitude='0.1', period='5e4', **kwargs):
         # fix deform
         self.deform = dftype
         self.deform_scale = kwargs.get('deform_scale', 2.0)
@@ -212,6 +214,8 @@ class Dynamics():
         self.deform_axis = axis
         self.deform_remap = kwargs.get('remap', 'v')
         self.deform_p_couple = kwargs.get('p_couple', False)
+        self.deform_amplitude = amplitude
+        self.deform_period = period
         return False
 
 
@@ -271,6 +275,27 @@ class Dynamics():
         self.timeave = True
         self.timeave_name = name
         self.timeave_var = var
+        self.timeave_nevery = nevery
+        self.timeave_nfreq = nfreq
+        self.timeave_nstep = nstep
+        self.timeave_nounfix = nounfix
+        return False
+
+    def add_timeave_wiggle(self, name=None, nevery=1, nfreq=1000, nstep=1000, nounfix=False):
+        # fix ave/time
+        self.timeave_wiggle = True
+        self.timeave_name = name
+        self.timeave_nevery = nevery
+        self.timeave_nfreq = nfreq
+        self.timeave_nstep = nstep
+        self.timeave_nounfix = nounfix
+        return False
+
+
+    def add_timeave_tg(self, name=None, nevery=1, nfreq=1000, nstep=1000, nounfix=False):
+        # fix ave/time
+        self.timeave_tg = True
+        self.timeave_name = name
         self.timeave_nevery = nevery
         self.timeave_nfreq = nfreq
         self.timeave_nstep = nstep
