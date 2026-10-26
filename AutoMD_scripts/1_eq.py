@@ -31,6 +31,36 @@ from radonpy.ff.gaff2 import GAFF2
 from radonpy.ff.gaff2_mod import GAFF2_mod
 from radonpy.ff.dreiding import Dreiding, Dreiding_UT
 
+from fractions import Fraction
+import math
+
+
+def parse_ratio_str(ratio_str):
+    ratio_list = []
+    for x in str(ratio_str).split(','):
+        x = x.strip()
+        if '/' in x:
+            num, den = x.split('/')
+            ratio_list.append(float(num) / float(den))
+        else:
+            ratio_list.append(float(x))
+    return ratio_list
+
+
+def get_unit_ratio(ratio):
+    fracs = [Fraction(str(x)).limit_denominator(100) for x in ratio]
+
+    lcm_denom = 1
+    for f in fracs:
+        lcm_denom = lcm_denom * f.denominator // math.gcd(lcm_denom, f.denominator)
+
+    ints = [int(f * lcm_denom) for f in fracs]
+
+    gcd_all = ints[0]
+    for x in ints[1:]:
+        gcd_all = math.gcd(gcd_all, x)
+
+    return [x // gcd_all for x in ints]
 
 if __name__ == '__main__':
     data = {
@@ -46,6 +76,7 @@ if __name__ == '__main__':
         'copoly_type': os.environ.get('RadonPy_Copoly_Type', 'random'),
         'input_natom': int(os.environ.get('RadonPy_NAtom', 1000)),
         'input_nchain': int(os.environ.get('RadonPy_NChain', 10)),
+        'copolymer_block': int(os.environ.get('RadonPy_Copoly_Block', 1)),
         'ini_density': float(os.environ.get('RadonPy_Ini_Density', 0.05)),
         'temp': float(os.environ.get('RadonPy_Temp', 300.0)),
         'press': float(os.environ.get('RadonPy_Press', 1.0)),
@@ -96,7 +127,7 @@ if __name__ == '__main__':
     io = helper.IO_Helper(work_dir, save_dir)
     monomer_dir = data['monomer_dir'].split(',') if data['monomer_dir'] else []
     ter_dir = data['ter_dir'] if data['ter_dir'] else save_dir
-    ratio = [float(x) for x in str(data['copoly_ratio_list']).split(',')]
+    ratio = parse_ratio_str(data['copoly_ratio_list'])
     rw_setting['work_dir'] = work_dir
 
 
@@ -189,9 +220,19 @@ if __name__ == '__main__':
 
         # Generate block copolymer chain
         elif len(mols) > 1 and data['copoly_type'] == 'block':
-            n_list = [round(n*(x/sum(ratio))) for x in ratio]
+            # in fact  [A_10-B_4]_1 and [A_5-B_2]_2 are different copolymers
+            n_block = data['copolymer_block']
+            unit_ratio = get_unit_ratio(ratio)
+            unit_size = sum(unit_ratio)
+            if n_block == 1:
+                scaler = n // unit_size
+            else:
+                scaler = n_block
+            n_list = [x * scaler for x in unit_ratio]
+            n = sum(n_list)
+            data['DP'] = n
 
-            copoly = poly.block_copolymerize_rw_mp(mols, n_list, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
+            copoly = poly.block_copolymerize_rw_mp(mols, n_list, n_block=n_block, tacticity=data['input_tacticity'], ter1=ter, ter2=ter2, nchain=1, **rw_setting)[0]
             data['tacticity'] = poly.get_tacticity(copoly)
 
             # Force field assignment

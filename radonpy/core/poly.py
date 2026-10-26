@@ -1100,7 +1100,7 @@ def _random_copolymerize_rw_mp_worker(args):
     return poly
 
 
-def block_copolymerize_rw(mols, n, init_poly=None, headhead=False, confId=0, tacticity='atactic', atac_ratio=0.5,
+def block_copolymerize_rw(mols, n, n_block=1, init_poly=None, headhead=False, confId=0, tacticity='atactic', atac_ratio=0.5,
             dist_min=0.7, retry=100, rollback=5, rollback_shaking=False, retry_step=200, retry_opt_step=0, ter1=None, ter2=None,
             label=None, label_ter1=1, label_ter2=1, res_name=None, ff=None, work_dir=None, omp=0, mpi=1, gpu=0, mp_idx=None):
     """
@@ -1138,7 +1138,7 @@ def block_copolymerize_rw(mols, n, init_poly=None, headhead=False, confId=0, tac
     if len(mols) != len(n):
         utils.radon_print('Inconsistency length of mols and n', level=3)
 
-    m_idx = gen_monomer_array(len(mols), n, copoly='block')
+    m_idx = gen_monomer_array(len(mols), n, n_block=n_block, copoly='block')
     chi_inv, check_chi = gen_chiral_inv_array(mols, m_idx, init_poly=init_poly, tacticity=tacticity, atac_ratio=atac_ratio)
     if not check_chi:
         tacticity = None
@@ -1181,7 +1181,7 @@ def block_copolymerize_rw_old(mols, n, init_poly=None, headhead=False, confId=0,
             res_name=res_name, ff=ff, work_dir=work_dir, omp=omp, mpi=mpi, gpu=gpu)
 
 
-def block_copolymerize_rw_mp(mols, n, init_poly=None, tacticity='atactic', atac_ratio=0.5,
+def block_copolymerize_rw_mp(mols, n, n_block=1, init_poly=None, tacticity='atactic', atac_ratio=0.5,
             dist_min=0.7, retry=100, rollback=5, rollback_shaking=False, retry_step=200, retry_opt_step=0, ter1=None, ter2=None,
             label=None, label_ter1=1, label_ter2=1, res_name=None, 
             ff=None, work_dir=None, omp=0, mpi=1, gpu=0, nchain=10, mp=10, fail_copy=True):
@@ -1200,7 +1200,7 @@ def block_copolymerize_rw_mp(mols, n, init_poly=None, tacticity='atactic', atac_
     np = max([nchain, mp])
 
     c = utils.picklable_const()
-    args = [(mols, n, init_poly, tacticity, atac_ratio, dist_min, retry, rollback, rollback_shaking, retry_step, retry_opt_step,
+    args = [(mols, n, n_block, init_poly, tacticity, atac_ratio, dist_min, retry, rollback, rollback_shaking, retry_step, retry_opt_step,
             ter1, ter2, label, label_ter1, label_ter2, res_name, ff, work_dir, omp, mpi, gpu, mp_idx, c) for mp_idx in range(np)]
 
     polys = polymerize_mp_exec(_block_copolymerize_rw_mp_worker, args, mp, nchain=nchain, fail_copy=fail_copy)
@@ -1209,12 +1209,12 @@ def block_copolymerize_rw_mp(mols, n, init_poly=None, tacticity='atactic', atac_
 
 
 def _block_copolymerize_rw_mp_worker(args):
-    (mols, n, init_poly, tacticity, atac_ratio, dist_min, retry, rollback, rollback_shaking, retry_step, retry_opt_step,
+    (mols, n, n_block, init_poly, tacticity, atac_ratio, dist_min, retry, rollback, rollback_shaking, retry_step, retry_opt_step,
         ter1, ter2, label, label_ter1, label_ter2, res_name, ff, work_dir, omp, mpi, gpu, mp_idx, c) = args
     utils.restore_const(c)
 
     try:
-        poly = block_copolymerize_rw(mols, n, init_poly=init_poly, tacticity=tacticity, atac_ratio=atac_ratio, dist_min=dist_min, 
+        poly = block_copolymerize_rw(mols, n, n_block=n_block, init_poly=init_poly, tacticity=tacticity, atac_ratio=atac_ratio, dist_min=dist_min,
                     retry=retry, rollback=rollback, rollback_shaking=rollback_shaking, retry_step=retry_step, retry_opt_step=retry_opt_step,
                     ter1=ter1, ter2=ter2, label=label, label_ter1=label_ter1, label_ter2=label_ter2, res_name=res_name,
                     ff=ff, work_dir=work_dir, omp=omp, mpi=mpi, gpu=gpu, mp_idx=mp_idx)
@@ -1348,7 +1348,7 @@ def terminate_rw(poly, mol1, mol2=None, confId=0, dist_min=1.0, retry=100, rollb
     return poly_c
 
 
-def gen_monomer_array(n_mon, n, copoly='alt', ratio=[], reac_ratio=[]):
+def gen_monomer_array(n_mon, n, n_block=1, copoly='alt', ratio=[], reac_ratio=[]):
     """
     poly.gen_monomer_array
 
@@ -1427,9 +1427,11 @@ def gen_monomer_array(n_mon, n, copoly='alt', ratio=[], reac_ratio=[]):
         if len(n) != n_mon:
             utils.radon_print('Inconsistency length of mols and n', level=3)
 
-        for i in range(n_mon):
-            tmp = [i]*n[i]
-            mon_array.extend(tmp)
+        unit_n = [x //n_block for x in n]
+        for _ in range(n_block):
+            for i in range(n_mon):
+                tmp = [i]*unit_n[i]
+                mon_array.extend(tmp)
         mon_array = np.array(mon_array[:])
 
     else:
