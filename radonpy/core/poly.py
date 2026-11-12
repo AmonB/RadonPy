@@ -1621,7 +1621,7 @@ def amorphous_cell(mols, n, cell=None, density=0.1, retry=20, retry_step=1000, t
 
                 check_3d = check_3d_structure_cell(cell_c, mol_coord_c, dist_min=threshold)
                 if check_3d and check_bond_ring_intersection and has_ring:
-                    check_3d, tri_coord_new, bond_coord_new = check_3d_bond_ring_intersection(cell_c, mon=mol_c, mon_coord=mol_coord_c,
+                    check_3d, tri_coord_new, bond_coord_new = check_3d_bond_ring_intersection(cell_c, mon=mol, mon_coord=mol_coord_c,
                                                                     tri_coord=tri_coord, bond_coord=bond_coord, mp=mp)
                 if check_3d:
                     if check_bond_ring_intersection and has_ring:
@@ -1733,7 +1733,7 @@ def nematic_cell(mols, n, cell=None, density=0.1, retry=20, retry_step=1000, thr
     # Alignment molecules
     for mol in mols_c:
         Chem.rdMolTransforms.CanonicalizeConformer(mol.GetConformer(0), ignoreHs=False)
-        sssr_tmp = Chem.GetSSSR(mol_c)
+        sssr_tmp = Chem.GetSSSR(mol)
         if type(sssr_tmp) is int:
             if sssr_tmp > 0:
                 has_ring = True
@@ -1778,7 +1778,7 @@ def nematic_cell(mols, n, cell=None, density=0.1, retry=20, retry_step=1000, thr
 
                 check_3d = check_3d_structure_cell(cell_c, mol_coord_c, dist_min=threshold)
                 if check_3d and check_bond_ring_intersection and has_ring:
-                    check_3d, tri_coord_new, bond_coord_new = check_3d_bond_ring_intersection(cell_c, mon=mol_c, mon_coord=mol_coord_c,
+                    check_3d, tri_coord_new, bond_coord_new = check_3d_bond_ring_intersection(cell_c, mon=mol, mon_coord=mol_coord_c,
                                                                     tri_coord=tri_coord, bond_coord=bond_coord, mp=mp)
                 if check_3d:
                     if check_bond_ring_intersection and has_ring:
@@ -3852,7 +3852,7 @@ def extract_mainchain(smiles, label=1):
             try:
                 main_smi = Chem.MolToSmiles(Chem.MolFromSmiles(s.replace('[%iH]' % int(label+2), '*')))
             except:
-                utils.radon_print('Cannot convert to canonical SMILES from %s' % smi, level=2)
+                utils.radon_print('Cannot convert to canonical SMILES from %s' % s, level=2)
 
     return main_smi
 
@@ -3861,7 +3861,7 @@ def extract_sidechain(smiles, label=1):
 
     side_smi = []
 
-    fsmi = fragmentation_main_side_chain(smiles, label=1)
+    fsmi = fragmentation_main_side_chain(smiles, label=label)
     if fsmi is None:
         return side_smi
 
@@ -3870,7 +3870,7 @@ def extract_sidechain(smiles, label=1):
             try:
                 side_smi.append(Chem.MolToSmiles(Chem.MolFromSmiles(s)))
             except:
-                utils.radon_print('Cannot convert to canonical SMILES from %s' % smi, level=2)
+                utils.radon_print('Cannot convert to canonical SMILES from %s' % s, level=2)
 
     return side_smi
 
@@ -4239,7 +4239,7 @@ def branch_polymerization_rw(poly_mol, mols, n, confId=0, n_dist='uniform',
 
         if not _pf:
             if type(n) is int:
-                n_array = np.full(n, len(func_array))
+                n_array = np.full(len(func_array), n)
             elif type(n) is list and n_dist == 'uniform':
                 n_array = np.random.randint(n[0], n[1], size=len(func_array))
             elif type(n) is list and n_dist == 'normal':
@@ -4255,8 +4255,8 @@ def branch_polymerization_rw(poly_mol, mols, n, confId=0, n_dist='uniform',
                     chi_inv = [False]
                     tactic = None
                 else:
-                    m_idx = poly.gen_monomer_array(len(mols[idx]), n_array[i], copoly=copoly_type)
-                    chi_inv, check_chi = poly.gen_chiral_inv_array(mols[idx], m_idx, tacticity=tacticity, atac_ratio=atac_ratio)
+                    m_idx = gen_monomer_array(len(mols[idx]), n_array[i], copoly=copoly_type)
+                    chi_inv, check_chi = gen_chiral_inv_array(mols[idx], m_idx, tacticity=tacticity, atac_ratio=atac_ratio)
                     if not check_chi:
                         tactic = None
                     else:
@@ -4268,10 +4268,10 @@ def branch_polymerization_rw(poly_mol, mols, n, confId=0, n_dist='uniform',
                 # 3rd arg.: Whether to perform chiral inversion (List of boolean)
                 # label: List of label to be used as connecting points
                 #        [[head label of mol1, tail label of mol1], [head label of mol2, tail label of mol2], ...]
-                bpoly = poly.random_walk_polymerization(mols[idx], m_idx, chi_inv, confId=confId, label=label, init_poly=bpoly,
+                bpoly = random_walk_polymerization(mols[idx], m_idx, chi_inv, confId=confId, label=label, init_poly=bpoly,
                                                         label_init=pos, tacticity=tactic, **kwargs)
             else:
-                poly.set_linker_flag(bpoly, label=pos)
+                set_linker_flag(bpoly, label=pos)
                 bpoly.GetAtomWithIdx(bpoly.GetIntProp('tail_idx')).SetIsotope(0)
 
     dt2 = datetime.datetime.now()

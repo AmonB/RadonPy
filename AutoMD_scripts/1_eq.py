@@ -248,6 +248,50 @@ if __name__ == '__main__':
         utils.MolToJSON(ac, os.path.join(save_dir, 'amorphous.json'))
         utils.pickle_dump(ac, os.path.join(save_dir, 'amorphous.pickle'))
 
+    # save amorphous cell
+    utils.MolToPDBFile(ac, os.path.join(save_dir, 'amorphous.pdb'))
+
+    # if you've built a linear polymer, you may want to build a branched copolymer, but it is complicated and case-to-case.
+    # You need to know how to match the graft site, then replace the site with [4H] for the branch_polymerization_rw
+
+    # example match -CH2=CH2-
+    # smarts_pattern = "[CH2]-[CH2]"
+    # query = Chem.MolFromSmarts(smarts_pattern)
+    # matches = ac.GetSubstructMatches(query, uniquify=True)
+    # carbons_idx = [match[0] for match in matches]
+    # c1_sites = carbons_idx[0::2]
+    # c2_sites = carbons_idx[1::2]
+    # for c_idx in c1_sites:
+    #     for n in ac.GetAtomWithIdx(c_idx).GetNeighbors():
+    #         if n.GetSymbol() == 'H':
+    #             n.SetIsotope(4)
+    #             break  # only one H is replaced
+
+    # example match -CH2-CH(Ph)-
+    # smarts_pattern = "[CH](-[c])"
+    # query = Chem.MolFromSmarts(smarts_pattern)
+    # matches = ac.GetSubstructMatches(query, uniquify=True)
+    # # CH sites
+    # for match in matches:
+    #     for n in ac.GetAtomWithIdx(match[0]).GetNeighbors():
+    #         if n.GetSymbol() == 'H':
+    #             n.SetIsotope(4)
+
+    # CH2 sites
+    # ps_ch2 = []
+    # for match in matches:
+    #     ch_idx = match[0]
+    #     for n in ac.GetAtomWithIdx(ch_idx).GetNeighbors():
+    #         if n.GetAtomicNum() == 6 and not n.GetIsAromatic():
+    #             ps_ch2.append(n.GetIdx())
+    #             break
+    #
+    # for c_idx in ps_ch2:
+    #     for n in ac.GetAtomWithIdx(c_idx).GetNeighbors():
+    #         if n.GetSymbol() == 'H':
+    #             n.SetIsotope(4)
+    #             break  # only one H
+
     # Input data and monomer properties are outputted
     poly_stats = poly.polymer_stats(ac, df=False, join=True)
     data.update(poly_stats)

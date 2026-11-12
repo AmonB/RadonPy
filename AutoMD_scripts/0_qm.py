@@ -46,12 +46,12 @@ if __name__ == '__main__':
     omp_psi4 = int(os.environ.get('RadonPy_OMP_Psi4', 4))
     mem_psi4 = int(os.environ.get('RadonPy_MEM_Psi4', 1000))
 
-    opt_basis = os.environ.get('RadonPy_QM_Basis', 'def2-TZVP'),
-    opt_basis_gen = os.environ.get('RadonPy_QM_Basis_Gen', {'Br': 'def2-TZVP', 'I': 'def2-TZVP'}),
-    sp_basis =  os.environ.get('RadonPy_SP_Basis', 'def2-TZVPP'),
-    sp_basis_gen = os.environ.get('RadonPy_QM_Basis_Gen', {'Br': 'def2-TZVPP', 'I': 'def2-TZVPP'}),
-    polar_basis = os.environ.get('RadonPy_POLAR_Basis', 'def2-TZVPPD'),
-    polar_basis_gen = {'Br': 'def2-TZVPPD', 'I': 'def2-TZVPPD'},
+    opt_basis = os.environ.get('RadonPy_QM_Basis', 'def2-TZVP')
+    opt_basis_gen = os.environ.get('RadonPy_QM_Basis_Gen', {'Br': 'def2-TZVP', 'I': 'def2-TZVP'})
+    sp_basis =  os.environ.get('RadonPy_SP_Basis', 'def2-TZVPP')
+    sp_basis_gen = os.environ.get('RadonPy_QM_Basis_Gen', {'Br': 'def2-TZVPP', 'I': 'def2-TZVPP'})
+    polar_basis = os.environ.get('RadonPy_POLAR_Basis', 'def2-TZVPPD')
+    polar_basis_gen = {'Br': 'def2-TZVPPD', 'I': 'def2-TZVPPD'}
 
     conf_mm_omp = int(os.environ.get('RadonPy_Conf_MM_OMP', 1))
     conf_mm_mpi = int(os.environ.get('RadonPy_Conf_MM_MPI', utils.cpu_count()))
