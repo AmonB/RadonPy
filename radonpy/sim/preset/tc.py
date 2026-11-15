@@ -82,6 +82,11 @@ class NEMD_MP(preset.Preset):
         rep = kwargs.get('rep', 3)
         repo = kwargs.get('rep_other', 1)
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
+        if decomp and lmp._use_kokkos(gpu):
+            utils.radon_print('Centroid heat-flux calculation uses CPU forces for LAMMPS compatibility.', level=1)
+            lmp.kokkos = 'off'
+            gpu = omp = 0
+            intel = opt = 'off'
 
         self.make_lammps_input(confId=confId, step=step, time_step=time_step, temp=temp, rep=rep, rep_other=repo,
             decomp=decomp, step_decomp=step_decomp, decomp_intermol=decomp_intermol)
@@ -798,6 +803,11 @@ class NEMD_MP_Additional(NEMD_MP):
             RDKit Mol object
         """
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
+        if decomp and lmp._use_kokkos(gpu):
+            utils.radon_print('Centroid heat-flux calculation uses CPU forces for LAMMPS compatibility.', level=1)
+            lmp.kokkos = 'off'
+            gpu = omp = 0
+            intel = opt = 'off'
         self.make_lammps_input(confId=confId, step=step, time_step=time_step, temp=temp,
             decomp=decomp, step_decomp=step_decomp, decomp_intermol=decomp_intermol)
 
@@ -1209,6 +1219,11 @@ class NEMD_Langevin(preset.Preset):
         rep = kwargs.get('rep', 3)
         repo = kwargs.get('rep_other', 1)
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
+        if decomp and lmp._use_kokkos(gpu):
+            utils.radon_print('Centroid heat-flux calculation uses CPU forces for LAMMPS compatibility.', level=1)
+            lmp.kokkos = 'off'
+            gpu = omp = 0
+            intel = opt = 'off'
 
         self.make_lammps_input(confId=confId, step=step, time_step=time_step, h_temp=h_temp, l_temp=l_temp, rep=rep, rep_other=repo,
             decomp=decomp, step_decomp=step_decomp, decomp_intermol=decomp_intermol)
@@ -1843,6 +1858,11 @@ class EMD_GK(preset.Preset):
             RDKit Mol object
         """
         lmp = lammps.LAMMPS(work_dir=self.work_dir, solver_path=self.solver_path)
+        if lmp._use_kokkos(gpu):
+            utils.radon_print('Centroid heat-flux calculation uses CPU forces for LAMMPS compatibility.', level=1)
+            lmp.kokkos = 'off'
+            gpu = omp = 0
+            intel = opt = 'off'
         self.make_lammps_input(confId=confId, step=step, time_step=time_step, temp=temp, hfsample=hfsample, hfcorrlen=hfcorrlen, **kwargs)
 
         dt1 = datetime.datetime.now()

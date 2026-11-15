@@ -292,6 +292,9 @@ if __name__ == '__main__':
     #             n.SetIsotope(4)
     #             break  # only one H
 
+    # bpoly = poly.branch_polymerization_rw(poly_mol=ac, mols=mol[0], n=6)
+    # utils.MolToPDBFile(bpoly, os.path.join(save_dir, 'branched_poly.pdb'))
+
     # Input data and monomer properties are outputted
     poly_stats = poly.polymer_stats(ac, df=False, join=True)
     data.update(poly_stats)

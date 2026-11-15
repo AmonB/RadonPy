@@ -211,11 +211,12 @@ class Dynamics():
         self.deform_scale = kwargs.get('deform_scale', 2.0)
         self.deform_fin_lo = kwargs.get('deform_fin_lo', -10.0)
         self.deform_fin_hi = kwargs.get('deform_fin_hi', 10.0)
+        self.deform_rate = kwargs.get('deform_rate', 0.0) # dftype 'erate': engineering strain rate (1/fs)
         self.deform_axis = axis
         self.deform_remap = kwargs.get('remap', 'v')
         self.deform_p_couple = kwargs.get('p_couple', False)
-        self.deform_amplitude = amplitude
-        self.deform_period = period
+        self.deform_amplitude = amplitude # dftype 'wiggle': amplitude of oscillation (distance units)
+        self.deform_period = period # dftype 'wiggle': period of oscillation (time units)
         return False
 
 
